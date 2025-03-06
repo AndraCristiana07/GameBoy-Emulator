@@ -14,6 +14,7 @@ import (
 type CPU struct {
 	Registers Registers
 	Memory    [8192]uint8
+	//OpcodesTable map[string]map[string][]map[string]string
 }
 type Registers struct {
 	A, B, C, D, E, F, H, L uint8
@@ -95,12 +96,6 @@ func (cpu *CPU) getImmediate16() uint8 {
 	val := cpu.Memory[cpu.Registers.PC]
 	cpu.Registers.PC += 2
 	return val
-}
-
-func (cpu *CPU) incPC() {
-	opcode := cpu.Memory[cpu.Registers.PC]
-	cpu.Registers.PC++
-	cpu.execOpcodes(opcode)
 }
 
 func (cpu *CPU) execLD(operands []map[string]string) {
@@ -275,6 +270,60 @@ func (cpu *CPU) execADD(operands []map[string]string, flags map[string]string) {
 
 }
 
+func (cpu *CPU) execSUB(operands []map[string]string, flags map[string]string) {
+	dest := operands[0]["name"]
+	src := operands[1]["name"]
+	srcImmd := operands[1]["immediate"]
+	fmt.Println("src:", src, "srcImmd:", srcImmd, "dest:", dest)
+	var value1 uint8
+	switch src {
+	case "A":
+		value1 = cpu.Registers.A
+	case "B":
+		value1 = cpu.Registers.B
+	case "C":
+		value1 = cpu.Registers.C
+	case "D":
+		value1 = cpu.Registers.D
+	case "E":
+		value1 = cpu.Registers.E
+	case "H":
+		value1 = cpu.Registers.H
+	case "L":
+		value1 = cpu.Registers.L
+	case "HL":
+		if srcImmd == "True" {
+			value1 = uint8(cpu.Registers.getHL())
+
+		} else {
+			value1 = cpu.Memory[cpu.Registers.getHL()]
+		}
+	case "n8":
+		value1 = cpu.getImmediate8()
+
+	}
+	var value2 uint8
+	var res uint8
+
+	value2 = cpu.Registers.A
+	res = value2 - value1
+	cpu.Registers.A = res
+
+	if flags["Z"] == "Z" {
+		cpu.Registers.setFlag(flagZ, cpu.Registers.A == 0)
+	}
+	if flags["N"] == "1" {
+		cpu.Registers.setFlag(flagN, true)
+	}
+	// Set if no borrow from bit 4
+	if flags["H"] == "H" {
+		cpu.Registers.setFlag(flagH, (value2&0x0F) < (value1&0x0F))
+	}
+	//Set if no borrow ?!
+	if flags["C"] == "C" {
+		cpu.Registers.setFlag(flagC, value2 > value1)
+	}
+}
 func (cpu *CPU) setINCFlags(reg uint8, flags map[string]string) {
 	//Set if carry from bit 3
 	halfCarry := (reg & 0x0F) == 0x0F
@@ -332,14 +381,78 @@ func (cpu *CPU) execINC(operands []map[string]string, flags map[string]string) {
 		value := cpu.Registers.getDE()
 		value++
 		cpu.Registers.setDE(value)
+	case "SP":
+		cpu.Registers.SP++
 	}
+
 	//if flags["H"] == "H" {
 	//	cpu.Registers.setFlag(flagH, )
 	//}
 }
 
-func fetchOpcodes(function string) (map[string][]map[string]string, error) {
-	functionName := "import opcodeParser; print(opcodeParser." + function + "())"
+func (cpu *CPU) setDECFlags(reg uint8, flags map[string]string) {
+	//Set if no borrow from bit 4
+	halfCarry := (reg & 0x0F) == 0x00
+	if flags["H"] == "H" {
+		cpu.Registers.setFlag(flagH, halfCarry)
+	}
+	if flags["Z"] == "Z" {
+		cpu.Registers.setFlag(flagZ, reg == 0)
+	}
+	cpu.Registers.setFlag(flagN, true)
+}
+
+func (cpu *CPU) execDEC(operands []map[string]string, flags map[string]string) {
+	operand := operands[0]["name"]
+	operandImmd := operands[0]["immediate"]
+	fmt.Println("operand:", operand, "immd:", operandImmd)
+	switch operand {
+	case "A":
+		cpu.setDECFlags(cpu.Registers.A, flags)
+		cpu.Registers.A--
+	case "B":
+		cpu.setDECFlags(cpu.Registers.B, flags)
+		cpu.Registers.B--
+	case "C":
+		cpu.setDECFlags(cpu.Registers.C, flags)
+		cpu.Registers.C--
+	case "D":
+		cpu.setDECFlags(cpu.Registers.D, flags)
+		cpu.Registers.D--
+	case "E":
+		cpu.setDECFlags(cpu.Registers.E, flags)
+		cpu.Registers.E--
+	case "H":
+		cpu.setDECFlags(cpu.Registers.H, flags)
+		cpu.Registers.H--
+	case "L":
+		cpu.setDECFlags(cpu.Registers.L, flags)
+		cpu.Registers.L--
+	case "BC":
+		value := cpu.Registers.getBC()
+		value--
+		cpu.Registers.setBC(value)
+	case "DE":
+		value := cpu.Registers.getDE()
+		value--
+		cpu.Registers.setDE(value)
+	case "HL":
+		if operandImmd == "True" {
+			value := cpu.Registers.getHL()
+			value--
+			cpu.Registers.setHL(value)
+		} else {
+			value := cpu.Memory[cpu.Registers.getHL()]
+			value--
+			cpu.Memory[cpu.Registers.getHL()] = value
+		}
+	case "SP":
+		cpu.Registers.SP--
+	}
+}
+
+func fetchOpcodesFromJSON() (map[string]map[string][]map[string]string, error) {
+	functionName := "import opcodeParser; print(opcodeParser.parse_operations())"
 	fmt.Println("Function:", functionName)
 	cmd := exec.Command("python3", "-c", functionName)
 	instr, err := cmd.Output()
@@ -349,14 +462,57 @@ func fetchOpcodes(function string) (map[string][]map[string]string, error) {
 		return nil, err
 	}
 
-	//fmt.Println(string(instr))
-	var instructions map[string][]map[string]string
+	var instructions map[string]map[string][]map[string]string
 	err = json.Unmarshal(instr, &instructions)
 	if err != nil {
 		println(err.Error())
 	}
 
 	return instructions, nil
+}
+
+func (cpu *CPU) fetchOpcode() uint8 {
+	opcode := cpu.Memory[cpu.Registers.PC]
+	fmt.Println("Opcode in fetch:", opcode)
+	cpu.Registers.PC++
+	return opcode
+}
+
+func (cpu *CPU) execCommand() {
+	opcode := cpu.fetchOpcode()
+	//fmt.Printf("Executing opcode: 0x%X\n", opcode)
+	fmt.Printf("Executing opcode: 0x%02X\n", opcode)
+
+	instructions, err := fetchOpcodesFromJSON()
+	if err != nil {
+		fmt.Println("Error fetching opcodes:", err.Error())
+		return
+	}
+	//fmt.Println("Instructions:", instructions)
+	for instr, table := range instructions {
+		if details, found := table[fmt.Sprintf("0x%02X", opcode)]; found {
+			operands := details[:len(details)-1]
+			flags := details[len(details)-1]
+
+			switch instr {
+			case "LD":
+				cpu.execLD(operands)
+			case "ADD":
+				cpu.execADD(operands, flags)
+			case "SUB":
+				cpu.execSUB(operands, flags)
+			case "INC":
+				cpu.execINC(operands, flags)
+			case "DEC":
+				cpu.execDEC(operands, flags)
+			default:
+				fmt.Printf("Unhandled operation: %s for opcode 0x%X\n", instr, opcode)
+			}
+			return
+		}
+	}
+
+	fmt.Printf("Unknown opcode: 0x%X\n", opcode)
 }
 
 //func main() {
@@ -367,6 +523,11 @@ func fetchOpcodes(function string) (map[string][]map[string]string, error) {
 //	//register.setFlag(flagZ, true)
 //	//fmt.Println(register.getAF())
 //	//cpu := CPU{}
-//	instr, _ := fetchOpcodes("op_LD")
-//	fmt.Println(instr)
+//	//instr, _ := fetchOpcodesFromJSON("op_LD")
+//	//fmt.Println(instr)
+//	//opcodes, _ := fetchAllOpcodesFromJSON()
+//	//fmt.Println("Opcodes:", opcodes)
+//	cpu := CPU{}
+//	cpu.loadOperations()
+//	//cpu.execCommand()
 //}
