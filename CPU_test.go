@@ -440,6 +440,50 @@ func TestDEC_A_B(t *testing.T) {
 	}
 }
 
+// SUB A, B
+func TestSUB_A_B(t *testing.T) {
+	cpu := CPU{
+		Registers: Registers{
+			A: 0x08,
+			B: 0x06,
+		},
+		Memory: [8192]uint8(make([]uint8, 8192)),
+	}
+	operands := []map[string]string{
+		{"name": "A", "immediate": "True"},
+		{"name": "B", "immediate": "True"},
+	}
+	flags := map[string]string{
+		"Z": "Z",
+		"N": "1",
+		"H": "H",
+		"C": "C",
+	}
+	cpu.execSUB(operands, flags)
+	fmt.Println(cpu.Registers.A)
+	if cpu.Registers.A != 0x02 {
+		t.Error("Expected 0x02, got ", cpu.Registers.A)
+	}
+
+}
+
+// TODO: push ?!
+func TestPUSH(t *testing.T) {
+	cpu := CPU{}
+	cpu.Registers.setBC(0x0004)
+	cpu.Registers.SP = 0x0055
+	cpu.Memory = [8192]uint8(make([]uint8, 8192))
+	operands := []map[string]string{
+		{"name": "BC", "immediate": "True"},
+	}
+	cpu.execPUSH(operands)
+	fmt.Println("GGGGGGGGGGGG")
+	fmt.Println(cpu.Memory[cpu.Registers.SP+1])
+	fmt.Println(cpu.Memory[cpu.Registers.SP+2])
+	fmt.Println(cpu.Memory[cpu.Registers.SP])
+
+}
+
 func TestExecOpcode(t *testing.T) {
 	cpu := CPU{
 		Registers: Registers{

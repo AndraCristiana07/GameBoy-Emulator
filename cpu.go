@@ -7,6 +7,15 @@ import (
 	"os/exec"
 )
 
+// TODO UNFIXED: AND, OR, XOR, PUSH, POP, SBC, CP,
+// TODO: DAA, CPL, CCF, SCF, NOP, HALT, STOP, DI, EI
+// TODO: JP, JR, CALL
+// TODO: RST, RET, RETI
+
+// TODO PREFIXED: SWAP
+// TODO: RLCA, RLA, RRCA, RRA, RLC, RL, RRC, RR, SLA, SRA, SRL
+//TODO: BIT, SET, RES
+
 // A, B, C, D, E, F, H, and L - 8 bit
 // SP, PC - 16 bit
 // AF, BC, DE, and HL
@@ -451,6 +460,165 @@ func (cpu *CPU) execDEC(operands []map[string]string, flags map[string]string) {
 	}
 }
 
+func (cpu *CPU) execPUSH(operands []map[string]string) {
+	// Push register pair nn onto stack.
+	// Decrement Stack Pointer (SP) twice
+	var value uint16
+	operand := operands[0]["name"]
+	operandImmd := operands[0]["immediate"]
+	fmt.Println("operand:", operand, "immd:", operandImmd)
+	switch operand {
+	case "BC":
+		value = cpu.Registers.getBC()
+	case "DE":
+		value = cpu.Registers.getDE()
+	case "HL":
+		value = cpu.Registers.getHL()
+	case "AF":
+		value = cpu.Registers.getAF()
+	}
+	cpu.Memory[cpu.Registers.SP-1] = uint8((value & 0xFF) >> 8) //hi
+	cpu.Memory[cpu.Registers.SP-2] = uint8(value & 0xFF)        //lo
+	cpu.Registers.SP -= 2
+}
+
+func (cpu *CPU) execPOP(operands []map[string]string) {
+	//Pop two bytes off stack into register pair nn.
+	// Increment Stack Pointer (SP) twice.
+	cpu.Registers.SP += 2
+	high := uint16(cpu.Memory[cpu.Registers.SP])
+	low := uint16(cpu.Memory[cpu.Registers.SP+1])
+	operand := operands[0]["name"]
+	operandImmd := operands[0]["immediate"]
+	fmt.Println("operand:", operand, "immd:", operandImmd)
+	value := (high << 8) | low // combine low and high
+	switch operand {
+	case "BC":
+		cpu.Registers.setBC(value)
+	case "DE":
+		cpu.Registers.setDE(value)
+	case "HL":
+		cpu.Registers.setHL(value)
+	case "AF":
+		cpu.Registers.setAF(value) //TODO: add flags
+	}
+
+}
+
+func (cpu *CPU) execAND(operands []map[string]string, flags map[string]string) {
+	// Logically AND n with A, result in A
+	operand := operands[1]["name"]
+	operandImmd := operands[1]["immediate"]
+	var value uint8
+	switch operand {
+	case "A":
+		value = cpu.Registers.A
+	case "B":
+		value = cpu.Registers.B
+	case "C":
+		value = cpu.Registers.C
+	case "D":
+		value = cpu.Registers.D
+	case "E":
+		value = cpu.Registers.E
+	case "H":
+		value = cpu.Registers.H
+	case "L":
+		value = cpu.Registers.L
+	case "n8":
+		value = cpu.getImmediate8()
+	case "HL":
+		if operandImmd == "False" {
+			value = cpu.Memory[cpu.Registers.getHL()]
+		}
+	}
+	cpu.Registers.A &= value
+	if flags["Z"] == "Z" {
+		cpu.Registers.setFlag(flagZ, cpu.Registers.A == 0)
+
+	}
+	cpu.Registers.setFlag(flagN, false) //reset
+	cpu.Registers.setFlag(flagH, true)  //set
+	cpu.Registers.setFlag(flagC, false) //reset
+
+}
+
+func (cpu *CPU) execOR(operands []map[string]string, flags map[string]string) {
+	//Logical OR n with register A, result in A.
+	operand := operands[1]["name"]
+	operandImmd := operands[1]["immediate"]
+	var value uint8
+	switch operand {
+	case "A":
+		value = cpu.Registers.A
+	case "B":
+		value = cpu.Registers.B
+	case "C":
+		value = cpu.Registers.C
+	case "D":
+		value = cpu.Registers.D
+	case "E":
+		value = cpu.Registers.E
+	case "H":
+		value = cpu.Registers.H
+	case "L":
+		value = cpu.Registers.L
+	case "n8":
+		value = cpu.getImmediate8()
+	case "HL":
+		if operandImmd == "False" {
+			value = cpu.Memory[cpu.Registers.getHL()]
+		}
+	}
+	cpu.Registers.A |= value
+	if flags["Z"] == "Z" {
+		cpu.Registers.setFlag(flagZ, cpu.Registers.A == 0)
+
+	}
+	cpu.Registers.setFlag(flagN, false) //reset
+	cpu.Registers.setFlag(flagH, false) //reset
+	cpu.Registers.setFlag(flagC, false) //reset
+
+}
+
+func (cpu *CPU) execXOR(operands []map[string]string, flags map[string]string) {
+	//Logical exclusive OR n with register A, result in A.
+	operand := operands[1]["name"]
+	operandImmd := operands[1]["immediate"]
+	var value uint8
+	switch operand {
+	case "A":
+		value = cpu.Registers.A
+	case "B":
+		value = cpu.Registers.B
+	case "C":
+		value = cpu.Registers.C
+	case "D":
+		value = cpu.Registers.D
+	case "E":
+		value = cpu.Registers.E
+	case "H":
+		value = cpu.Registers.H
+	case "L":
+		value = cpu.Registers.L
+	case "n8":
+		value = cpu.getImmediate8()
+	case "HL":
+		if operandImmd == "False" {
+			value = cpu.Memory[cpu.Registers.getHL()]
+		}
+	}
+	cpu.Registers.A ^= value
+	if flags["Z"] == "Z" {
+		cpu.Registers.setFlag(flagZ, cpu.Registers.A == 0)
+
+	}
+	cpu.Registers.setFlag(flagN, false) //reset
+	cpu.Registers.setFlag(flagH, false) //reset
+	cpu.Registers.setFlag(flagC, false) //reset
+
+}
+
 func fetchOpcodesFromJSON() (map[string]map[string][]map[string]string, error) {
 	functionName := "import opcodeParser; print(opcodeParser.parse_operations())"
 	fmt.Println("Function:", functionName)
@@ -505,6 +673,10 @@ func (cpu *CPU) execCommand() {
 				cpu.execINC(operands, flags)
 			case "DEC":
 				cpu.execDEC(operands, flags)
+			case "PUSH":
+				cpu.execPUSH(operands)
+			case "POP":
+				cpu.execPOP(operands)
 			default:
 				fmt.Printf("Unhandled operation: %s for opcode 0x%X\n", instr, opcode)
 			}
