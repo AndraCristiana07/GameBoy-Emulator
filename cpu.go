@@ -398,6 +398,51 @@ func (cpu *CPU) execRRHL() {
 	cpu.Registers.setFlag(flagH, false) //reset
 }
 
+func (cpu *CPU) handleInterruptions() {
+	// The IME (interrupt master enable) flag is reset by DI
+	// and prohibits all interrupts. It is set by EI and
+	// acknowledges the interrupt setting by the IE register.
+	// 1. When an interrupt is generated, the IF flag will be
+	// set.
+	// 2. If the IME flag is set & the corresponding IE flag
+	// is set, the following 3 steps are performed.
+	// 3. Reset the IME flag and prevent all interrupts.
+	// 4. The PC (program counter) is pushed onto the stack.
+	// 5. Jump to the starting address of the interrupt.
+	if !cpu.IME {
+		return
+	}
+	IE := cpu.Memory[0xFFF] //Interrupt enable
+	IF := cpu.Memory[0xF0F] //Interrupt flag
+	interruptsions := IE & IF
+	if interruptsions == 0 {
+		return
+	}
+	cpu.IME = false //Reset the IME flag and prevent all interrupts
+	//The priorities follow the order of the bits in the IE and IF registers:
+	//Bit 0 (VBlank) has the highest priority, and
+	//Bit 4 (Joypad) has the lowest priority.
+	//	7 6	5	  4		  3		 2	     1	  0
+	//IF		Joypad	Serial	Timer	LCD	VBlank
+	var addr uint16
+	if interruptsions&0x01 != 0 { //VBlank
+		addr = 0x40
+	} else if interruptsions&0x02 != 0 { //LCD
+		addr = 0x48
+	} else if interruptsions&0x04 != 0 { //Timer
+		addr = 0x50
+	} else if interruptsions&0x08 != 0 { //Serial
+		addr = 0x58
+	} else if interruptsions&0x10 != 0 { // Joypad
+		addr = 0x60
+	}
+	if addr != 0 {
+		cpu.push(cpu.Registers.PC)
+		cpu.Registers.PC = addr
+	}
+
+}
+
 func (cpu *CPU) execOpcodes() {
 	opcode := cpu.fetchOpcode()
 	if cpu.halted {
@@ -406,6 +451,7 @@ func (cpu *CPU) execOpcodes() {
 	if cpu.stopped {
 		return
 	}
+	cpu.handleInterruptions()
 	// fmt.Printf("Executing opcode: 0x%02X\n", opcode)
 	switch opcode {
 	case 0b1: // 0x01 -> LD BC, imm16
