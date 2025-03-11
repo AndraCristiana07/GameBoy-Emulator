@@ -31,18 +31,6 @@ func TestSetHL(t *testing.T) {
 	}
 }
 
-//func TestAssignToA(t *testing.T) {
-//	register := Registers{}
-//
-//}
-
-//func TestSetFlagZ(t *testing.T) {
-//	register := Registers{}
-//	register.setFlag(flagZ, true)
-//	// fmt.Println(register.getAF())
-//
-//}
-
 // LD A,B
 func TestExecLDAB(t *testing.T) {
 	cpu := CPU{
@@ -50,7 +38,7 @@ func TestExecLDAB(t *testing.T) {
 			A: 0b1,
 			B: 0b10,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b1111000
@@ -69,7 +57,7 @@ func TestExecLD_B_C(t *testing.T) {
 			B: 0b1,
 			C: 0b10,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b1000001
@@ -91,7 +79,7 @@ func TestExecLD_A(t *testing.T) {
 			H: 0b110,
 			L: 0b111,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1111000 // LD A, B
 	cpu.execOpcodes()
@@ -155,7 +143,7 @@ func TestExecLD_B(t *testing.T) {
 			H: 0b110,
 			L: 0b111,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1000111 // LD B, A
 	cpu.execOpcodes()
@@ -216,7 +204,7 @@ func TestExecLD_C(t *testing.T) {
 			H: 0b110,
 			L: 0b111,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1001111 // LD C, A
 	cpu.execOpcodes()
@@ -276,7 +264,7 @@ func TestExecLD_D(t *testing.T) {
 			H: 0b110,
 			L: 0b111,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1010111 // LD D, A
 	cpu.execOpcodes()
@@ -336,7 +324,7 @@ func TestExecLD_E(t *testing.T) {
 			H: 0b110,
 			L: 0b111,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1011111 // LD E, A
 	cpu.execOpcodes()
@@ -396,7 +384,7 @@ func TestExecLD_H(t *testing.T) {
 			H: 0b110,
 			L: 0b111,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1100111 // LD H, A
 	cpu.execOpcodes()
@@ -456,7 +444,7 @@ func TestExecLD_L(t *testing.T) {
 			H: 0b110,
 			L: 0b111,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1101111 // LD L, A
 	cpu.execOpcodes()
@@ -516,7 +504,7 @@ func TestExecLD_HL(t *testing.T) {
 			H: 0b110,
 			L: 0b111,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Memory[cpu.Registers.getHL()] = 0b1111
 	cpu.Memory[cpu.Registers.PC] = 0b1110111 // LD [HL], A
@@ -573,7 +561,7 @@ func TestExecLD_HL_n16(t *testing.T) {
 			L: 0b110110,
 			B: 0b10,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b100001
@@ -585,100 +573,6 @@ func TestExecLD_HL_n16(t *testing.T) {
 		t.Error("Expected 0b11, got ", cpu.Registers.getHL())
 	}
 }
-
-//
-//// LD C, H
-//func TestExecLD_C_H(t *testing.T) {
-//	cpu := CPU{
-//		Registers: Registers{
-//			C: 0b1,
-//			H: 0b10,
-//		},
-//		Memory: [8192]uint8(make([]uint8, 8192)),
-//	}
-//
-//	cpu.Memory[cpu.Registers.PC] = 0b1001100
-//	cpu.execOpcodes()
-//	if cpu.Registers.C != 0b10 {
-//		t.Error("Expected 0b10, got ", cpu.Registers.C)
-//	}
-//}
-//
-//// LD B, [HL]
-//func TestExecLDHLMem(t *testing.T) {
-//	cpu := CPU{
-//		Registers: Registers{
-//			H: 0b10010,
-//			L: 0b111011,
-//			B: 0b1010,
-//		},
-//		Memory: [8192]uint8(make([]uint8, 8192)),
-//	}
-//
-//	hladdr := cpu.Registers.getHL()
-//	cpu.Memory[hladdr] = 0b1
-//
-//	//operands := []map[string]string{
-//	//	{"name": "B", "immediate": "True"},
-//	//	{"name": "HL", "immediate": "False"},
-//	//}
-//	//cpu.execLD(operands)
-//
-//	cpu.Memory[cpu.Registers.PC] = 0b1000110
-//	cpu.execOpcodes()
-//	// fmt.Println("LD B, [HL] TEST")
-//	// fmt.Println(cpu.Registers.B)
-//	if cpu.Registers.B != 0b1 {
-//		t.Error("Expected 0b10, got ", cpu.Registers.B)
-//	}
-//}
-//
-//// LD [HL], B
-//func TestExecLDHL(t *testing.T) {
-//	cpu := CPU{
-//		Registers: Registers{
-//			H: 0b10100,
-//			L: 0b110110,
-//			B: 0b10,
-//		},
-//		Memory: [8192]uint8(make([]uint8, 8192)),
-//	}
-//
-//	hladdr := cpu.Registers.getHL()
-//	cpu.Memory[hladdr] = 0b1
-//
-//	cpu.Memory[cpu.Registers.PC] = 0b1110000
-//	cpu.execOpcodes()
-//	// fmt.Println("LD [HL], B TEST")
-//
-//	// fmt.Println(cpu.Registers.B)
-//	// fmt.Println(cpu.Memory[hladdr])
-//	if cpu.Memory[hladdr] != 0b10 {
-//		t.Error("Expected 0b10, got ", cpu.Memory[hladdr])
-//	}
-//}
-//
-//// LD H, [HL]
-//func TestExecLDHHL(t *testing.T) {
-//	cpu := CPU{
-//		Registers: Registers{
-//			H: 0b10100,
-//			L: 0b110,
-//			B: 0b10,
-//		},
-//		Memory: [8192]uint8(make([]uint8, 8192)),
-//	}
-//
-//	hladdr := cpu.Registers.getHL()
-//	cpu.Memory[hladdr] = 0b1
-//	cpu.Memory[cpu.Registers.PC] = 0b1100110
-//	cpu.execOpcodes()
-//	// fmt.Println("LD H, [HL] TEST")
-//	// fmt.Println(cpu.Registers.H)
-//	if cpu.Registers.H != 0b1 {
-//		t.Error("Expected 0b10, got ", cpu.Registers.H)
-//	}
-//}
 
 // ADD A,n
 func TestExecADDA(t *testing.T) {
@@ -692,7 +586,7 @@ func TestExecADDA(t *testing.T) {
 			H: 0b110,
 			L: 0b111,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	var res uint8
 
@@ -748,7 +642,7 @@ func TestSUB_A(t *testing.T) {
 			H: 0b110,
 			L: 0b111,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	var res uint8
@@ -807,7 +701,7 @@ func TestExecADD_HL_BC(t *testing.T) {
 			B: 0b10,
 			C: 0b110,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	var res uint16
@@ -857,7 +751,7 @@ func TestINC_B(t *testing.T) {
 		Registers: Registers{
 			B: 0b1,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b100
@@ -876,7 +770,7 @@ func TestINC_C(t *testing.T) {
 		Registers: Registers{
 			C: 0b1,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b1100
@@ -893,7 +787,7 @@ func TestINC_D(t *testing.T) {
 		Registers: Registers{
 			D: 0b1,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b10100
@@ -910,7 +804,7 @@ func TestINC_E(t *testing.T) {
 		Registers: Registers{
 			E: 0b1,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b11100
@@ -927,7 +821,7 @@ func TestINC_H(t *testing.T) {
 		Registers: Registers{
 			H: 0b1,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b100100
@@ -944,7 +838,7 @@ func TestINC_L(t *testing.T) {
 		Registers: Registers{
 			L: 0b1,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b101100
@@ -962,7 +856,7 @@ func TestINC_BC(t *testing.T) {
 			B: 0b1,
 			C: 0b10,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Registers.setBC(0b100)
 
@@ -982,7 +876,7 @@ func TestINC_DE(t *testing.T) {
 			D: 0b1,
 			E: 0b10,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b11
@@ -999,7 +893,7 @@ func TestINC_HL(t *testing.T) {
 			H: 0b1,
 			L: 0b10,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Registers.setHL(0b100)
 
@@ -1019,7 +913,7 @@ func TestINC_HLmem(t *testing.T) {
 			H: 0b1,
 			L: 0b10,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Registers.setHL(0b100)
 	hladdr := cpu.Registers.getHL()
@@ -1040,7 +934,7 @@ func TestDEC_A(t *testing.T) {
 		Registers: Registers{
 			A: 0b110,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b111101
@@ -1057,7 +951,7 @@ func TestDEC_B(t *testing.T) {
 		Registers: Registers{
 			B: 0b110,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b101
@@ -1074,7 +968,7 @@ func TestDEC_C(t *testing.T) {
 		Registers: Registers{
 			C: 0b110,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b1101
@@ -1091,7 +985,7 @@ func TestDEC_D(t *testing.T) {
 		Registers: Registers{
 			D: 0b110,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b10101
@@ -1108,7 +1002,7 @@ func TestDEC_E(t *testing.T) {
 		Registers: Registers{
 			E: 0b110,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b11101
@@ -1125,7 +1019,7 @@ func TestDEC_H(t *testing.T) {
 		Registers: Registers{
 			H: 0b110,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b100101
@@ -1142,7 +1036,7 @@ func TestDEC_L(t *testing.T) {
 		Registers: Registers{
 			L: 0b110,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b101101
@@ -1160,7 +1054,7 @@ func TestDEC_DE(t *testing.T) {
 			D: 0b1,
 			E: 0b10,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Registers.setDE(0b100)
 	//operands := []map[string]string{
@@ -1189,7 +1083,7 @@ func TestDEC_BC(t *testing.T) {
 			B: 0b1,
 			C: 0b10,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b1011
@@ -1208,7 +1102,7 @@ func TestDEC_HLmem(t *testing.T) {
 			H: 0b1,
 			L: 0b10,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	cpu.Registers.setHL(0b100)
 	hladdr := cpu.Registers.getHL()
@@ -1238,7 +1132,7 @@ func TestDEC_SP(t *testing.T) {
 		Registers: Registers{
 			SP: 0b100,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	//operands := []map[string]string{
 	//	{"name": "SP", "immediate": "True"},
@@ -1264,7 +1158,7 @@ func TestSUB_A_B(t *testing.T) {
 			A: 0b1000,
 			B: 0b110,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
 	//operands := []map[string]string{
 	//	{"name": "A", "immediate": "True"},
@@ -1287,23 +1181,6 @@ func TestSUB_A_B(t *testing.T) {
 
 }
 
-// TODO: push ?!
-func TestPUSH(t *testing.T) {
-	cpu := CPU{}
-	cpu.Registers.setBC(0b100)
-	cpu.Registers.SP = 0b110111
-	cpu.Memory = [8192]uint8(make([]uint8, 8192))
-	//operands := []map[string]string{
-	//	{"name": "BC", "immediate": "True"},
-	//}
-	//cpu.execPUSH(operands)
-	// fmt.Println("GGGGGGGGGGGG")
-	// fmt.Println(cpu.Memory[cpu.Registers.SP+1])
-	// fmt.Println(cpu.Memory[cpu.Registers.SP+2])
-	// fmt.Println(cpu.Memory[cpu.Registers.SP])
-
-}
-
 // AND A, B
 func TestAND(t *testing.T) {
 	cpu := CPU{
@@ -1311,23 +1188,12 @@ func TestAND(t *testing.T) {
 			A: 0b1,
 			B: 0b1,
 		},
-		Memory: [8192]uint8(make([]uint8, 8192)),
+		Memory: [32767]uint8(make([]uint8, 8192)),
 	}
-	//operands := []map[string]string{
-	//	{"name": "A", "immediate": "True"},
-	//	{"name": "B", "immediate": "True"},
-	//}
-	//flags := map[string]string{
-	//	"Z": "Z",
-	//	"N": "0",
-	//	"H": "1",
-	//	"C": "0",
-	//}
-	//cpu.execAND(operands, flags)
+
 	cpu.Memory[cpu.Registers.PC] = 0b10100000
 	cpu.execOpcodes()
-	// fmt.Println("AND A, B TEST")
-	// fmt.Println(cpu.Registers.A)
+
 	if cpu.Registers.A != 0b1 {
 		t.Error("Expected 0b1, got ", cpu.Registers.A)
 	}
