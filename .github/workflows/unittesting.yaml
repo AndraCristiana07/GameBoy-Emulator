@@ -14,7 +14,9 @@ jobs:
     steps:
     - name: Checkout Repo
       uses: actions/checkout@v4
-    
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install libwayland0 libwayland-dev
     - name: Unit Test
       run: go test -v
     
