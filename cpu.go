@@ -11,7 +11,8 @@ import (
 // https://github.com/veandco/go-sdl2
 type CPU struct {
 	Registers Registers
-	Memory    [32767]uint8
+	Memory    [65536]uint8
+	Cartridge *Cartridge
 	//OpcodesTable map[string]map[string][]map[string]string
 	IME          bool // interrupt master enable
 	IMEScheduled bool //enable IME after one instr
@@ -444,7 +445,6 @@ func (cpu *CPU) handleInterruptions() {
 }
 
 func (cpu *CPU) execOpcodes() {
-	opcode := cpu.fetchOpcode()
 	if cpu.halted {
 		return
 	}
@@ -453,6 +453,8 @@ func (cpu *CPU) execOpcodes() {
 	}
 	cpu.handleInterruptions()
 	// fmt.Printf("Executing opcode: 0x%02X\n", opcode)
+	opcode := cpu.fetchOpcode()
+	fmt.Printf("pc: 0x%04X and opcode: 0x%02X\n", cpu.Registers.PC, opcode)
 	switch opcode {
 	case 0b1: // 0x01 -> LD BC, imm16
 		cpu.Registers.setBC(uint16(cpu.getImmediate16()))
@@ -1842,7 +1844,29 @@ func (cpu *CPU) execOpcodes() {
 		fmt.Println("ILLEGAL_FD")
 		break
 	}
+	//if cpu.Registers.PC > 0xFFFF {
+	//	fmt.Println("PC out of bounds")
+	//	break
+	//}
+
 	cpu.checkSchedule()
+}
+
+func (cpu *CPU) loadROMFile(cartridge *Cartridge) {
+	cpu.Cartridge = cartridge
+	copy(cpu.Memory[:], cartridge.ROMdata)
+	cpu.Registers.PC = 0x100
+}
+
+func (cpu *CPU) run() {
+
+	for {
+		cpu.execOpcodes()
+		if cpu.Registers.PC > 0xFFFF {
+			fmt.Println("PC out of bounds")
+			break
+		}
+	}
 }
 
 //func main() {
