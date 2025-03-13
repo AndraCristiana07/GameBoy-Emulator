@@ -25,7 +25,7 @@ type Cartridge struct {
 	ROMdata         []byte   //all data
 }
 
-func loadCartridge(filename string) (*Cartridge, error) {
+func LoadCartridge(filename string) (*Cartridge, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		fmt.Printf("Error reading cartridge file: %s\n", err)
