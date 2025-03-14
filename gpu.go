@@ -8,6 +8,9 @@ import (
 const width = 160
 const height = 144
 
+const bgWidth = 256
+const bgHeight = 256
+
 const VRAM_START = 0x8000
 const VRAM_END = 0x97FF
 const VRAM_SIZE = VRAM_END - VRAM_START
@@ -33,6 +36,23 @@ type Graphics struct {
 	OAM     [160]byte //Object Attribute Memory
 	LCDC    byte      // LCD control
 	tileSet [384]tile
+
+	LY   uint8 // FF44, value from 0-153
+	LYC  uint8 // FF45
+	STAT uint8 //FF41
+
+	//SCY, SCX: Background viewport Y position, X position
+	SCY uint8 // FF42
+	SCX uint8 // FF43
+
+	//Window Y position, X position plus 7
+	WY uint8 // FF4A
+	WX uint8 // FF4B
+
+	BGP uint8 //FF47
+
+	OBP0 uint8 //FF48
+	OBP1 uint8 // FF49
 }
 
 // Priority: 0 = No, 1 = BG and Window colors 1–3 are drawn over this OBJ
@@ -108,11 +128,14 @@ func (graphic *Graphics) writeOAM(address uint16, value byte) {
 }
 
 func (graphic *Graphics) spritesOAM() {
-	spriteSize := 8 //TODO based on lcdc to be 8 or 16
+	spriteSize := 8
 
-	//if graphic.LCDC&(1<<2) != 0 {
-	//	spriteSize = 16
-	//}
+	//In 8x16 sprite mode, the least significant bit of the
+	// sprite pattern number is ignored and treated as 0.
+
+	if graphic.LCDC&(1<<2) != 0 {
+		spriteSize = 16
+	}
 
 	//test sprite
 	//for i := 0; i < 12; i++ {
@@ -120,7 +143,7 @@ func (graphic *Graphics) spritesOAM() {
 	//}
 
 	// display up to 40 movable objects (or sprites)
-	for i := 0; i < 12; i++ {
+	for i := 0; i < 40; i++ {
 		// each sprite consists of 4 bytes
 		spriteAddr := i * 4
 
@@ -136,6 +159,12 @@ func (graphic *Graphics) spritesOAM() {
 		tileIndex := graphic.OAM[spriteAddr+2]
 		fmt.Printf("Tile index: %d\n", tileIndex)
 
+		if spriteSize == 16 {
+			tileIndex &= 0xFF // mask bit 0
+		}
+		//if tileIndex >= 384 {
+		//	continue
+		//}
 		//Byte 3 — Attributes/Flags
 		attributes := graphic.OAM[spriteAddr+3]
 
@@ -152,7 +181,7 @@ func (graphic *Graphics) spritesOAM() {
 		for row := 0; row < 8; row++ {
 			tileY := row
 			if yFlip != 0 {
-				tileY = spriteSize - row
+				tileY = spriteSize - 1 - row
 			}
 			for col := 0; col < 8; col++ {
 				tileX := col
@@ -192,3 +221,42 @@ func (graphic *Graphics) testPixelDrawing() {
 		}
 	}
 }
+
+//		7				  6					5					4
+//LCD & PPU enable	Window tile map		Window enable	BG & Window tiles
+
+//	3			2			1				0
+//
+// BG tile map	OBJ size	OBJ enable	BG & Window enable / priority
+func (graphic *Graphics) lcdControlBits() (byte, byte, byte, byte, byte, byte, byte, byte) {
+	LCDEnable := graphic.LCDC & (1 << 7)
+	windowTileMapArea := graphic.LCDC & (1 << 6) // 0 = 9800–9BFF; 1 = 9C00–9FFF
+	windowEnable := graphic.LCDC & (1 << 5)
+	bgWinTileDataArea := graphic.LCDC & (1 << 4) //0 = 8800–97FF; 1 = 8000–8FFF
+	bgTileDataArea := graphic.LCDC & (1 << 3)    //0 = 9800–9BFF; 1 = 9C00–9FFF
+	objSize := graphic.LCDC & (1 << 2)           //0 = 8×8; 1 = 8×16
+	objEnable := graphic.LCDC & (1 << 1)
+	bgWinEnable := graphic.LCDC & (1 << 0)
+	return LCDEnable, windowTileMapArea, windowEnable, bgWinTileDataArea, bgTileDataArea, objSize, objEnable, bgWinEnable
+}
+
+//	7			6					5				4
+//			LYC int select	Mode 2 int select	Mode 1 int select
+//	3						2		  1	 0
+//
+// Mode 0 int select		LYC == LY	PPU mode
+func (graphic *Graphics) lcdStatusBits() (byte, byte, byte, byte, byte, byte) {
+	LYCSelect := graphic.STAT & (1 << 6) //If set, selects the LYC == LY condition for the STAT interrupt
+	mode2 := graphic.STAT & (1 << 5)     //f set, selects the Mode 2 condition for the STAT interrupt.
+	mode1 := graphic.STAT & (1 << 4)     //If set, selects the Mode 1 condition for the STAT interrupt.
+	mode0 := graphic.STAT & (1 << 3)     //If set, selects the Mode 0 condition for the STAT interrupt.
+	LYCeqLY := graphic.STAT & (1 << 2)   //Set when LY contains the same value as LYC; it is constantly updated.
+	PPUMode := graphic.STAT&(1<<1) | graphic.STAT&(1<<0)
+	return LYCSelect, mode2, mode1, mode0, LYCeqLY, PPUMode
+}
+
+//
+//func (graphics *Graphics) PPUcalcCoord() {
+//	bottom := (graphics.SCY + 143) % 255
+//	right := (graphics.SCX + 159) % 255
+//}

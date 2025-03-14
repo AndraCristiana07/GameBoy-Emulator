@@ -444,6 +444,18 @@ func (cpu *CPU) handleInterruptions() {
 
 }
 
+func (cpu *CPU) memoryWrite(addr uint16, value uint8) {
+	graphics := Graphics{}
+	switch {
+	case addr >= VRAM_START && addr <= VRAM_END:
+		graphics.writeVRAM(addr, value)
+	case addr >= 0xFE00 && addr <= 0xFE9F:
+		graphics.writeOAM(addr, value)
+	default:
+		cpu.Memory[addr] = value
+	}
+}
+
 func (cpu *CPU) execOpcodes() {
 	if cpu.halted {
 		return
@@ -454,7 +466,7 @@ func (cpu *CPU) execOpcodes() {
 	cpu.handleInterruptions()
 	// fmt.Printf("Executing opcode: 0x%02X\n", opcode)
 	opcode := cpu.fetchOpcode()
-	fmt.Printf("pc: 0x%04X and opcode: 0x%02X\n", cpu.Registers.PC, opcode)
+	//fmt.Printf("pc: 0x%04X and opcode: 0x%02X\n", cpu.Registers.PC, opcode)
 	switch opcode {
 	case 0b1: // 0x01 -> LD BC, imm16
 		cpu.Registers.setBC(uint16(cpu.getImmediate16()))
