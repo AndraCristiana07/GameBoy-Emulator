@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	rl "github.com/gen2brain/raylib-go/raylib"
+	"sort"
 )
 
 const width = 160
@@ -14,6 +15,11 @@ const bgHeight = 256
 const VRAM_START = 0x8000
 const VRAM_END = 0x97FF
 const VRAM_SIZE = VRAM_END - VRAM_START
+
+const MODE_HBLANK = 0
+const MODE_VBLANK = 1
+const MODE_OAMSCAN = 2
+const MODE_DRAWING = 3
 
 var colors = []rl.Color{rl.White, rl.LightGray, rl.DarkGray, rl.Black}
 
@@ -31,6 +37,11 @@ const (
 // tile = array of 8 rows where a row is an array of 8 TileValues
 type tile = [8][8]uint8
 
+type Sprite struct {
+	x, y       int
+	tileIndex  byte
+	attributes byte
+}
 type Graphics struct {
 	VRAM    [VRAM_SIZE]byte
 	OAM     [160]byte //Object Attribute Memory
@@ -52,7 +63,9 @@ type Graphics struct {
 	BGP uint8 //FF47
 
 	OBP0 uint8 //FF48
-	OBP1 uint8 // FF49
+	OBP1 uint8 // FF49\
+
+	mode int
 }
 
 // Priority: 0 = No, 1 = BG and Window colors 1–3 are drawn over this OBJ
@@ -127,7 +140,20 @@ func (graphic *Graphics) writeOAM(address uint16, value byte) {
 	//}
 }
 
-func (graphic *Graphics) spritesOAM() {
+// sprites tiles
+// OAM scan - mode 2
+func (graphic *Graphics) spritesOAM() [width]uint8 {
+
+	var spritePixels [width]uint8
+
+	for i := range spritePixels {
+		spritePixels[i] = 255 //default transparent
+	}
+
+	//// sprite disable
+	//if graphic.LCDC&(1<<1) == 0 {
+	//	return nil
+	//}
 	spriteSize := 8
 
 	//In 8x16 sprite mode, the least significant bit of the
@@ -136,6 +162,9 @@ func (graphic *Graphics) spritesOAM() {
 	if graphic.LCDC&(1<<2) != 0 {
 		spriteSize = 16
 	}
+
+	// 10 sprites visible at a time
+	var visibleSprites []Sprite
 
 	//test sprite
 	//for i := 0; i < 12; i++ {
@@ -168,21 +197,43 @@ func (graphic *Graphics) spritesOAM() {
 		//Byte 3 — Attributes/Flags
 		attributes := graphic.OAM[spriteAddr+3]
 
-		//					7			6	  5			 4		     3		 2	1	0
-		//Attributes	Priority	Y flip	X flip	 DMG palette 	Bank	CGB palette
-		//priority := attributes & (1 << 7)
-		yFlip := attributes & (1 << 6)
-		xFlip := attributes & (1 << 5)
-		//DMGPallete := attributes & (1 << 4)
+		//check if sprite is onscanline
+		if int(graphic.LY)+16 < y || int(graphic.LY)+16 > y+spriteSize-1 {
+			continue
+		}
 
-		tileData := graphic.tileSet[tileIndex]
-		fmt.Printf("Tile data: %d\n", tileData)
+		visibleSprites = append(visibleSprites, Sprite{x, y, tileIndex, attributes})
 
-		for row := 0; row < 8; row++ {
-			tileY := row
+		// TODO: sort sprites by priority
+		// order by X (smaller X->bigger prority)
+		//if x the same => by OAM location order
+		sort.Slice(visibleSprites, func(i, j int) bool {
+			return visibleSprites[i].x < visibleSprites[j].x
+		})
+
+		// render 10 sprites
+		if len(visibleSprites) > 10 {
+			visibleSprites = visibleSprites[:10]
+		}
+
+		for _, sprite := range visibleSprites {
+
+			//					7			6	  5			 4		     3		 2	1	0
+			//Attributes	Priority	Y flip	X flip	 DMG palette 	Bank	CGB palette
+			yFlip := sprite.attributes & (1 << 6)
+			xFlip := sprite.attributes & (1 << 5)
+			tileData := graphic.tileSet[sprite.tileIndex]
+			fmt.Printf("Tile data: %d\n", tileData)
+
+			priority := attributes & (1 << 7)
+
+			//DMGPallete := attributes & (1 << 4)
+
+			tileY := graphic.LY - uint8(sprite.y)
 			if yFlip != 0 {
-				tileY = spriteSize - 1 - row
+				tileY = uint8(spriteSize) - 1 - graphic.LY
 			}
+
 			for col := 0; col < 8; col++ {
 				tileX := col
 				if xFlip != 0 {
@@ -193,25 +244,148 @@ func (graphic *Graphics) spritesOAM() {
 				if pixelValue == 0 {
 					continue // transparent
 				}
-
-				screenX := x + col
-				screenY := y + row
-				// TODO: priority check
+				screenX := sprite.x + col
+				screenY := uint8(sprite.y) + graphic.LY
 
 				// check bounds
 				if screenX < 0 || screenY < 0 || screenX >= width || screenY >= height {
 					continue
 				}
-				fmt.Printf("ScreenX: %X , ScreenY: %X\n", screenX, screenY)
-				// draw pixels
-				rl.DrawPixel(int32(screenX), int32(screenY), colors[pixelValue])
-				fmt.Printf("Screen X: %d, Y: %d\n", screenX, screenY)
-				//rl.DrawPixel(int32(screenX), int32(screenY), rl.Blue)
+
+				//TODO: priority
+				bgPixels := graphic.getBackground()
+				bgPixelValue := bgPixels[screenY][screenX]
+				if priority != 0 && bgPixelValue != 0 {
+					continue
+				}
+
+				if spritePixels[screenX] == 255 {
+					spritePixels[screenX] = pixelValue
+				}
+				//rl.DrawPixel(int32(screenX), int32(screenY), colors[pixelValue])
 
 			}
+
 		}
 
+		//for row := 0; row < 8; row++ {
+		//	tileY := row
+		//	if yFlip != 0 {
+		//		tileY = spriteSize - 1 - row
+		//	}
+		//	for col := 0; col < 8; col++ {
+		//		tileX := col
+		//		if xFlip != 0 {
+		//			tileX = 7 - col
+		//		}
+		//		pixelValue := tileData[tileY][tileX]
+		//		fmt.Printf("Pixel value: %02X\n", pixelValue)
+		//		if pixelValue == 0 {
+		//			continue // transparent
+		//		}
+		//
+		//		screenX := x + col
+		//		screenY := y + row
+		//		// TODO: priority check
+		//
+		//		// check bounds
+		//		if screenX < 0 || screenY < 0 || screenX >= width || screenY >= height {
+		//			continue
+		//		}
+		//		fmt.Printf("ScreenX: %X , ScreenY: %X\n", screenX, screenY)
+		//		// draw pixels
+		//		rl.DrawPixel(int32(screenX), int32(screenY), colors[pixelValue])
+		//		fmt.Printf("Screen X: %d, Y: %d\n", screenX, screenY)
+		//		//rl.DrawPixel(int32(screenX), int32(screenY), rl.Blue)
+		//
+		//	}
+		//}
+
 	}
+	return spritePixels
+}
+
+// background tiles
+func (graphic *Graphics) getBackground() [][]uint8 {
+	// $9800-$9BFF and $9C00-$9FFF
+	var bgPixels [][]uint8
+	for screenY := 0; screenY < height; screenY++ {
+		for screenX := 0; screenX < width; screenX++ {
+			bgY := (screenY + int(graphic.LY) + int(graphic.SCY)) & 0xFF
+
+			bgX := (screenX + int(graphic.SCX)) & 0x1F
+			bgMapAddr := uint16(0x9800) //default
+			if graphic.LCDC&(1<<3) != 0 {
+				bgMapAddr = uint16(0x9C00)
+			}
+			tileIdxAddr := bgMapAddr + uint16((bgY/8)*32+(bgX/8))
+			//tileIndex := graphic.VRAM[tileIdxAddr]
+			tileIndex := graphic.readVRAM(tileIdxAddr)
+			var tileNumber int
+			//$8000-$97FFbgY
+			if graphic.LCDC&(1<<4) != 0 {
+				tileNumber = int(tileIndex)
+			} else {
+				tileNumber = int(int8(tileIndex)) // make it signed from unsigned
+			}
+
+			tileData := graphic.tileSet[tileNumber]
+			tileY := bgY % 8
+			tileX := bgX % 8
+			bgPixels[screenY][screenX] = tileData[tileY][tileX]
+
+		}
+	}
+	return bgPixels
+
+}
+
+// window tiles
+func (graphic *Graphics) getWindow() [][]uint8 {
+	// window display disabled
+	if graphic.LCDC&(1<<5) == 0 {
+		return nil
+	}
+
+	var window [][]uint8
+	for screenY := 0; screenY < height; screenY++ {
+		if screenY < int(graphic.WY) {
+			continue
+		}
+		for screenX := 0; screenX < width; screenX++ {
+			//if graphic.WX < 7 {
+			//	continue
+			//}
+			if screenX < int(graphic.WX)-7 {
+				continue
+			}
+			winY := screenY - int(graphic.WY)
+
+			winX := screenX - (int(graphic.WX) - 7)
+			winMapAddr := uint16(0x9800)
+			if graphic.LCDC&(1<<6) != 0 {
+				winMapAddr = uint16(0x9C00)
+			}
+			tileIdxAddr := winMapAddr + uint16((winY/8)*32+(winX/8))
+			//tileIndex := graphic.VRAM[tileIdxAddr]
+			tileIndex := graphic.readVRAM(tileIdxAddr)
+
+			var tileNumber int
+
+			if graphic.LCDC&(1<<4) != 0 {
+				tileNumber = int(tileIndex)
+			} else {
+				tileNumber = int(int8(tileIndex))
+			}
+
+			tileData := graphic.tileSet[tileNumber]
+			tileY := winY % 8
+			tileX := winX % 8
+			window[screenY][screenX] = tileData[tileY][tileX]
+
+		}
+	}
+	return window
 }
 
 func (graphic *Graphics) testPixelDrawing() {
