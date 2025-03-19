@@ -216,12 +216,15 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 			visibleSprites = visibleSprites[:10]
 		}
 
+		bgPixels := graphic.getBackground()
+
 		for _, sprite := range visibleSprites {
 
 			//					7			6	  5			 4		     3		 2	1	0
 			//Attributes	Priority	Y flip	X flip	 DMG palette 	Bank	CGB palette
 			yFlip := sprite.attributes & (1 << 6)
 			xFlip := sprite.attributes & (1 << 5)
+
 			tileData := graphic.tileSet[sprite.tileIndex]
 			fmt.Printf("Tile data: %d\n", tileData)
 
@@ -231,7 +234,7 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 
 			tileY := graphic.LY - uint8(sprite.y)
 			if yFlip != 0 {
-				tileY = uint8(spriteSize) - 1 - graphic.LY
+				tileY = uint8(spriteSize) - 1 - graphic.LY - uint8(sprite.y)
 			}
 
 			for col := 0; col < 8; col++ {
@@ -253,7 +256,6 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 				}
 
 				//TODO: priority
-				bgPixels := graphic.getBackground()
 				bgPixelValue := bgPixels[screenY][screenX]
 				if priority != 0 && bgPixelValue != 0 {
 					continue
@@ -268,47 +270,14 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 
 		}
 
-		//for row := 0; row < 8; row++ {
-		//	tileY := row
-		//	if yFlip != 0 {
-		//		tileY = spriteSize - 1 - row
-		//	}
-		//	for col := 0; col < 8; col++ {
-		//		tileX := col
-		//		if xFlip != 0 {
-		//			tileX = 7 - col
-		//		}
-		//		pixelValue := tileData[tileY][tileX]
-		//		fmt.Printf("Pixel value: %02X\n", pixelValue)
-		//		if pixelValue == 0 {
-		//			continue // transparent
-		//		}
-		//
-		//		screenX := x + col
-		//		screenY := y + row
-		//		// TODO: priority check
-		//
-		//		// check bounds
-		//		if screenX < 0 || screenY < 0 || screenX >= width || screenY >= height {
-		//			continue
-		//		}
-		//		fmt.Printf("ScreenX: %X , ScreenY: %X\n", screenX, screenY)
-		//		// draw pixels
-		//		rl.DrawPixel(int32(screenX), int32(screenY), colors[pixelValue])
-		//		fmt.Printf("Screen X: %d, Y: %d\n", screenX, screenY)
-		//		//rl.DrawPixel(int32(screenX), int32(screenY), rl.Blue)
-		//
-		//	}
-		//}
-
 	}
 	return spritePixels
 }
 
 // background tiles
-func (graphic *Graphics) getBackground() [][]uint8 {
+func (graphic *Graphics) getBackground() [height][width]uint8 {
 	// $9800-$9BFF and $9C00-$9FFF
-	var bgPixels [][]uint8
+	var bgPixels [height][width]uint8
 	for screenY := 0; screenY < height; screenY++ {
 		for screenX := 0; screenX < width; screenX++ {
 			bgY := (screenY + int(graphic.LY) + int(graphic.SCY)) & 0xFF
@@ -319,6 +288,10 @@ func (graphic *Graphics) getBackground() [][]uint8 {
 				bgMapAddr = uint16(0x9C00)
 			}
 			tileIdxAddr := bgMapAddr + uint16((bgY/8)*32+(bgX/8))
+
+			if tileIdxAddr < VRAM_START || tileIdxAddr > VRAM_END {
+				continue
+			}
 			//tileIndex := graphic.VRAM[tileIdxAddr]
 			tileIndex := graphic.readVRAM(tileIdxAddr)
 			var tileNumber int
@@ -341,13 +314,14 @@ func (graphic *Graphics) getBackground() [][]uint8 {
 }
 
 // window tiles
-func (graphic *Graphics) getWindow() [][]uint8 {
+func (graphic *Graphics) getWindow() [height][width]uint8 {
+	var window [height][width]uint8
+
 	// window display disabled
 	if graphic.LCDC&(1<<5) == 0 {
-		return nil
+		return window
 	}
 
-	var window [][]uint8
 	for screenY := 0; screenY < height; screenY++ {
 		if screenY < int(graphic.WY) {
 			continue
@@ -387,6 +361,44 @@ func (graphic *Graphics) getWindow() [][]uint8 {
 	}
 	return window
 }
+
+func (graphic *Graphics) renderScanline() {
+	if int(graphic.LY) >= height {
+		return
+	}
+
+	bgPixels := graphic.getBackground()
+	winPixels := graphic.getWindow()
+	spritePixels := graphic.spritesOAM()
+
+	for screenX := 0; screenX < width; screenX++ {
+		pixel := bgPixels[graphic.LY][screenX]
+		if graphic.LCDC&(1<<5) != 0 && winPixels[graphic.LY][screenX] != 0 {
+			pixel = winPixels[graphic.LY][screenX]
+
+		}
+		if graphic.LCDC&(1<<1) != 0 && spritePixels[screenX] != 255 {
+			pixel = spritePixels[screenX]
+		}
+		rl.DrawPixel(int32(screenX), int32(graphic.LY), colors[pixel])
+	}
+}
+
+//
+//func (graphic *Graphics) modesHandeling() {
+//	switch graphic.mode {
+//	//case MODE_HBLANK{}
+//	case MODE_OAMSCAN:
+//		//TODO: if smth do this
+//		graphic.mode = MODE_DRAWING
+//	case MODE_DRAWING:
+//		graphic.renderScanline()
+//
+//		//TODO: push pixels to LCD
+//	case
+//
+//	}
+//}
 
 func (graphic *Graphics) testPixelDrawing() {
 	for y := 0; y < width; y++ {
