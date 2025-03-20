@@ -21,6 +21,17 @@ const MODE_VBLANK = 1
 const MODE_OAMSCAN = 2
 const MODE_DRAWING = 3
 
+const CYCLES_PER_LINE = 456
+
+//// cycles per mode
+//const CYCLES_MODE_2 = 80  //searchin objects
+//const CYCLES_MODE_3 = 172 // drawing 172-289
+//const CYCLES_MODE_0 = 87  // hblank 87-204
+
+const SCANLINES_PER_FRAME = 144
+const VBLANK_LINES = 10
+const TOTAL_LINES = 154
+
 var colors = []rl.Color{rl.White, rl.LightGray, rl.DarkGray, rl.Black}
 
 type TilePixleID uint8
@@ -66,6 +77,8 @@ type Graphics struct {
 	OBP1 uint8 // FF49\
 
 	mode int
+
+	cycle int
 }
 
 // Priority: 0 = No, 1 = BG and Window colors 1–3 are drawn over this OBJ
@@ -384,21 +397,60 @@ func (graphic *Graphics) renderScanline() {
 	}
 }
 
-//
-//func (graphic *Graphics) modesHandeling() {
-//	switch graphic.mode {
-//	//case MODE_HBLANK{}
-//	case MODE_OAMSCAN:
-//		//TODO: if smth do this
-//		graphic.mode = MODE_DRAWING
-//	case MODE_DRAWING:
-//		graphic.renderScanline()
-//
-//		//TODO: push pixels to LCD
-//	case
-//
-//	}
-//}
+func (graphic *Graphics) modesHandeling(tCycles int) {
+	if graphic.LCDC&(1<<7) == 0 {
+		return //LCD disabled
+	}
+	graphic.cycle += tCycles
+
+	// at a time total amount of 80 T-Cycles
+	for graphic.cycle >= 80 {
+		switch graphic.mode {
+		case MODE_OAMSCAN:
+			//mode 2 80 cycles
+			if graphic.cycle >= 80 {
+				graphic.mode = MODE_DRAWING
+				graphic.cycle -= 80
+
+			}
+		case MODE_DRAWING:
+			//mode 3 172-289 cycles
+			if graphic.cycle >= 172 {
+				graphic.mode = MODE_HBLANK
+				graphic.cycle -= 172
+				graphic.renderScanline()
+
+			}
+
+		case MODE_HBLANK:
+			// mide 0 87-204cycles
+			if graphic.cycle >= 204 {
+				graphic.cycle -= 204
+				graphic.LY++
+
+				if graphic.LY == SCANLINES_PER_FRAME {
+					//enter VBlank
+					graphic.mode = MODE_VBLANK
+				} else {
+					graphic.mode = MODE_OAMSCAN // start next scanline
+				}
+			}
+
+		case MODE_VBLANK:
+			//mode 1 4560 cycles
+			if graphic.cycle >= CYCLES_PER_LINE {
+				graphic.LY++
+				graphic.cycle -= CYCLES_PER_LINE
+				if graphic.LY > TOTAL_LINES-1 { //end of vblank
+					graphic.LY = 0
+					graphic.mode = MODE_OAMSCAN // start new scanline
+
+				}
+			}
+		}
+	}
+
+}
 
 func (graphic *Graphics) testPixelDrawing() {
 	for y := 0; y < width; y++ {
