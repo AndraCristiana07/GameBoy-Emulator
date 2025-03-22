@@ -54,6 +54,7 @@ type Sprite struct {
 	attributes byte
 }
 type Graphics struct {
+	CPU     *CPU
 	VRAM    [VRAM_SIZE]byte
 	OAM     [160]byte //Object Attribute Memory
 	LCDC    byte      // LCD control
@@ -151,6 +152,178 @@ func (graphic *Graphics) writeOAM(address uint16, value byte) {
 	//if address >= 0xFE00 && address <= 0xFE9F {
 	graphic.OAM[address] = value
 	//}
+}
+
+func (graphic *Graphics) getFromMemory(address uint16) uint8 {
+	switch {
+	case address >= VRAM_START && address <= VRAM_END:
+		return graphic.readVRAM(address)
+	case address >= 0xFE00 && address <= 0xFE9F:
+		return graphic.readOAM(address)
+	case address == 0xFF44:
+		return graphic.LY
+	case address == 0xFF45:
+		return graphic.LYC
+	case address == 0xFF40:
+		// TODO: get for LCDC
+		graphic.getLCDC()
+	case address == 0xFF41:
+		//TODO: dct for STAT
+		graphic.getSTAT()
+	case address == 0xFF42:
+		return graphic.SCY
+	case address == 0xFF43:
+		return graphic.SCX
+	case address == 0xFF4A:
+		return graphic.WY
+	case address == 0xFF4B:
+		return graphic.WX
+	case address == 0xFF47:
+		return graphic.BGP
+	case address == 0xFF48:
+		return graphic.OBP0
+	case address == 0xFF49:
+		return graphic.OBP1
+
+	default:
+		fmt.Printf("GPU read unknown address")
+	}
+	return 0
+
+}
+
+func (graphic *Graphics) getSTAT() uint8 {
+	var bit1, bit2, bit3, bit4, bit5 uint8
+	LYCSelect, mode2, mode1, mode0, LYCeqLY, _ := graphic.lcdStatusBits()
+	if LYCSelect != 0 {
+		bit1 = 0b01000000
+	} else {
+		bit1 = 0
+	}
+	if mode2 != 0 {
+		bit2 = 0b00100000
+	} else {
+		bit2 = 0
+	}
+	if mode1 != 0 {
+		bit3 = 0b00010000
+	} else {
+		bit3 = 0
+	}
+	if mode0 != 0 {
+		bit4 = 0b00001000
+	} else {
+		bit4 = 0
+	}
+	if LYCeqLY != 0 {
+		bit5 = 0b00000100
+	} else {
+		bit5 = 0
+	}
+	return bit1 | bit2 | bit3 | bit4 | bit5 | uint8(graphic.mode)
+}
+
+func (graphic *Graphics) setSTAT(value uint8) {
+
+	LYCSelect, mode2, mode1, mode0, LYCeqLY, _ := graphic.lcdStatusBits()
+	LYCSelect |= value & 0b01000000
+	mode2 |= value & 0b00100000
+	mode1 |= value & 0b00010000
+	mode0 |= value & 0b00001000
+	LYCeqLY |= value & 0b00000100
+}
+
+func (graphic *Graphics) getLCDC() uint8 {
+	LCDEnable, windowTileMapArea, windowEnable, bgWinTileDataArea, bgTileDataArea, objSize, objEnable, bgWinEnable := graphic.lcdControlBits()
+	var bit1, bit2, bit3, bit4, bit5, bit6, bit7, bit8 uint8
+	if LCDEnable != 0 {
+		bit1 = 0b10000000
+
+	} else {
+		bit1 = 0
+	}
+	if windowTileMapArea != 0 {
+		bit2 = 0b01000000
+	} else {
+		bit2 = 0
+	}
+	if windowEnable != 0 {
+		bit3 = 0b00100000
+	} else {
+		bit3 = 0
+	}
+	if bgWinTileDataArea != 0 {
+		bit4 = 0b00010000
+	} else {
+		bit4 = 0
+	}
+	if bgTileDataArea != 0 {
+		bit5 = 0b00001000
+	} else {
+		bit5 = 0
+	}
+	if objSize != 0 {
+		bit6 = 0b00000100
+	} else {
+		bit6 = 0
+	}
+	if objEnable != 0 {
+		bit7 = 0b00000010
+	} else {
+		bit7 = 0
+	}
+	if bgWinEnable != 0 {
+		bit8 = 0b00000001
+	} else {
+		bit8 = 0
+	}
+	return bit1 | bit2 | bit3 | bit4 | bit5 | bit6 | bit7 | bit8
+}
+
+func (graphic *Graphics) setLCDC(value uint8) {
+	LCDEnable, windowTileMapArea, windowEnable, bgWinTileDataArea, bgTileDataArea, objSize, objEnable, bgWinEnable := graphic.lcdControlBits()
+	LCDEnable |= value & 0b10000000
+	windowTileMapArea |= value & 0b01000000
+	windowEnable |= value & 0b00100000
+	bgWinTileDataArea |= value & 0b00010000
+	bgTileDataArea |= value & 0b00001000
+	objSize |= value & 0b00000100
+	objEnable |= value & 0b00000010
+	bgWinEnable |= value & 0b00000001
+
+}
+
+func (graphic *Graphics) set(address uint16, value uint8) {
+	switch {
+	case address >= VRAM_START && address <= VRAM_END:
+		graphic.writeVRAM(address, value)
+	case address >= 0xFE00 && address <= 0xFE9F:
+		graphic.writeOAM(address, value)
+	case address == 0xFF44:
+		graphic.LY = value
+	case address == 0xFF45:
+		graphic.LYC = value
+	case address == 0xFF40:
+		// TODO: set for LCDC
+	case address == 0xFF41:
+		//TODO: set stat
+	case address == 0xFF42:
+		graphic.SCY = value
+	case address == 0xFF43:
+		graphic.SCX = value
+	case address == 0xFF4A:
+		graphic.WY = value
+	case address == 0xFF4B:
+		graphic.WX = value
+	case address == 0xFF47:
+		graphic.BGP = value
+	case address == 0xFF48:
+		graphic.OBP0 = value
+	case address == 0xFF49:
+		graphic.OBP1 = value
+
+	}
+
 }
 
 // sprites tiles
@@ -398,11 +571,12 @@ func (graphic *Graphics) renderScanline() {
 }
 
 func (graphic *Graphics) modesHandeling(tCycles int) {
+	cpu := CPU{}
 	if graphic.LCDC&(1<<7) == 0 {
 		return //LCD disabled
 	}
 	graphic.cycle += tCycles
-
+	LYCSelect, mode2, mode1, mode0, _, _ := graphic.lcdStatusBits()
 	// at a time total amount of 80 T-Cycles
 	for graphic.cycle >= 80 {
 		switch graphic.mode {
@@ -413,6 +587,12 @@ func (graphic *Graphics) modesHandeling(tCycles int) {
 				graphic.cycle -= 80
 
 			}
+			if mode2 != 0 {
+				//TODO: handle m2 interrupt
+				cpu.IF |= 1 << 1
+
+			}
+
 		case MODE_DRAWING:
 			//mode 3 172-289 cycles
 			if graphic.cycle >= 172 {
@@ -431,9 +611,15 @@ func (graphic *Graphics) modesHandeling(tCycles int) {
 				if graphic.LY == SCANLINES_PER_FRAME {
 					//enter VBlank
 					graphic.mode = MODE_VBLANK
+					// TODO: hanfle vblank interrupt
+					cpu.IF |= 1 << 0
 				} else {
 					graphic.mode = MODE_OAMSCAN // start next scanline
 				}
+			}
+			if mode0 != 0 {
+				//TODO: handle m0 interrupt
+				cpu.IF |= 1 << 1
 			}
 
 		case MODE_VBLANK:
@@ -446,6 +632,17 @@ func (graphic *Graphics) modesHandeling(tCycles int) {
 					graphic.mode = MODE_OAMSCAN // start new scanline
 
 				}
+			}
+			if mode1 != 0 {
+				//TODO: handle m1 interrupt
+				cpu.IF |= 1 << 1
+			}
+		}
+		if graphic.LY == graphic.LYC {
+			//set stat bit 2
+			graphic.STAT |= 1 << 2
+			if LYCSelect != 0 {
+				cpu.IF |= 1 << 1
 			}
 		}
 	}
