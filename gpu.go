@@ -16,6 +16,10 @@ const VRAM_START = 0x8000
 const VRAM_END = 0x97FF
 const VRAM_SIZE = VRAM_END - VRAM_START
 
+const OAM_START = 0xFE00
+const OAM_END = 0xFE9F
+
+const OAM_SIZE = OAM_END - OAM_START + 1
 const MODE_HBLANK = 0
 const MODE_VBLANK = 1
 const MODE_OAMSCAN = 2
@@ -56,8 +60,8 @@ type Sprite struct {
 type Graphics struct {
 	CPU     *CPU
 	VRAM    [VRAM_SIZE]byte
-	OAM     [160]byte //Object Attribute Memory
-	LCDC    byte      // LCD control
+	OAM     [OAM_SIZE]byte //Object Attribute Memory
+	LCDC    byte           // LCD control
 	tileSet [384]tile
 
 	LY   uint8 // FF44, value from 0-153
@@ -94,6 +98,40 @@ type Graphics struct {
 //	xFlip      bool
 //	DMGPalette bool
 //}
+
+func NewGraphics() *Graphics {
+	graphic := &Graphics{}
+
+	graphic.cycle = 0
+	graphic.LY = 0 //first scanline
+	graphic.LYC = 0
+	graphic.mode = MODE_OAMSCAN //?
+	//TODO: LCDC, STAT
+	//LYCSelect, mode2, mode1, mode0, LYCeqLY, _ := graphic.lcdStatusBits()
+	//LYCSelect |= 0
+	//mode2 |= 0
+	//mode1 |= 0
+	//mode0 |= 0
+	//LYCeqLY |= 0
+	graphic.STAT = 0b00000001 //?
+	graphic.LCDC = 0b10010001 //?
+
+	graphic.WX = 0
+	graphic.WY = 0
+	graphic.SCX = 0
+	graphic.SCY = 0
+
+	graphic.OBP1 = 1
+	graphic.OBP0 = 0
+
+	for i := 0; i < VRAM_SIZE; i++ {
+		graphic.VRAM[i] = 0
+	}
+	for i := 0; i < OAM_SIZE; i++ {
+		graphic.OAM[i] = 0
+	}
+	return graphic
+}
 
 func (graphic *Graphics) readVRAM(address uint16) byte {
 	if address >= VRAM_START && address <= VRAM_END {
@@ -142,7 +180,7 @@ func (graphic *Graphics) writeVRAM(address uint16, value byte) {
 }
 
 func (graphic *Graphics) readOAM(address uint16) byte {
-	if address >= 0xFE00 && address <= 0xFE9F {
+	if address >= OAM_START && address <= OAM_END {
 		return graphic.OAM[address]
 	}
 	return 0
@@ -158,7 +196,7 @@ func (graphic *Graphics) getFromMemory(address uint16) uint8 {
 	switch {
 	case address >= VRAM_START && address <= VRAM_END:
 		return graphic.readVRAM(address)
-	case address >= 0xFE00 && address <= 0xFE9F:
+	case address >= OAM_START && address <= OAM_END:
 		return graphic.readOAM(address)
 	case address == 0xFF44:
 		return graphic.LY
@@ -297,16 +335,16 @@ func (graphic *Graphics) set(address uint16, value uint8) {
 	switch {
 	case address >= VRAM_START && address <= VRAM_END:
 		graphic.writeVRAM(address, value)
-	case address >= 0xFE00 && address <= 0xFE9F:
+	case address >= OAM_START && address <= OAM_END:
 		graphic.writeOAM(address, value)
 	case address == 0xFF44:
 		graphic.LY = value
 	case address == 0xFF45:
 		graphic.LYC = value
 	case address == 0xFF40:
-		// TODO: set for LCDC
+		graphic.setLCDC(value)
 	case address == 0xFF41:
-		//TODO: set stat
+		graphic.setSTAT(value)
 	case address == 0xFF42:
 		graphic.SCY = value
 	case address == 0xFF43:
@@ -549,6 +587,7 @@ func (graphic *Graphics) getWindow() [height][width]uint8 {
 }
 
 func (graphic *Graphics) renderScanline() {
+
 	if int(graphic.LY) >= height {
 		return
 	}
@@ -588,7 +627,7 @@ func (graphic *Graphics) modesHandeling(tCycles int) {
 
 			}
 			if mode2 != 0 {
-				//TODO: handle m2 interrupt
+				// handle m2 interrupt
 				cpu.IF |= 1 << 1
 
 			}
@@ -611,14 +650,14 @@ func (graphic *Graphics) modesHandeling(tCycles int) {
 				if graphic.LY == SCANLINES_PER_FRAME {
 					//enter VBlank
 					graphic.mode = MODE_VBLANK
-					// TODO: hanfle vblank interrupt
+					// hanfle vblank interrupt
 					cpu.IF |= 1 << 0
 				} else {
 					graphic.mode = MODE_OAMSCAN // start next scanline
 				}
 			}
 			if mode0 != 0 {
-				//TODO: handle m0 interrupt
+				// handle m0 interrupt
 				cpu.IF |= 1 << 1
 			}
 
@@ -634,7 +673,7 @@ func (graphic *Graphics) modesHandeling(tCycles int) {
 				}
 			}
 			if mode1 != 0 {
-				//TODO: handle m1 interrupt
+				// handle m1 interrupt
 				cpu.IF |= 1 << 1
 			}
 		}
