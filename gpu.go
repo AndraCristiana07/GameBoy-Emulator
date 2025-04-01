@@ -58,7 +58,7 @@ type Sprite struct {
 	attributes byte
 }
 type Graphics struct {
-	CPU     *CPU
+	cpu     *CPU
 	VRAM    [VRAM_SIZE]byte
 	OAM     [OAM_SIZE]byte //Object Attribute Memory
 	LCDC    byte           // LCD control
@@ -101,12 +101,12 @@ type Graphics struct {
 
 func NewGraphics() *Graphics {
 	graphic := &Graphics{}
-
+	fmt.Println("New graphics called. address", &graphic)
 	graphic.cycle = 0
 	graphic.LY = 0 //first scanline
 	graphic.LYC = 0
 	graphic.mode = MODE_OAMSCAN //?
-	//TODO: LCDC, STAT
+
 	//LYCSelect, mode2, mode1, mode0, LYCeqLY, _ := graphic.lcdStatusBits()
 	//LYCSelect |= 0
 	//mode2 |= 0
@@ -154,6 +154,9 @@ func (graphic *Graphics) writeVRAM(address uint16, value byte) {
 	byte1 := graphic.VRAM[normalizedIndex]
 	byte2 := graphic.VRAM[normalizedIndex+1]
 
+	//byte1 := graphic.readVRAM(normalizedIndex)
+	//byte2 := graphic.readVRAM(normalizedIndex + 1)
+
 	tileIndex := index / 16      // each tile 16 bytes,  8 rows tall, 2 bytes => 16 bytes
 	rowIndex := (index % 16) / 2 // 2 bytes per row
 
@@ -194,10 +197,10 @@ func (graphic *Graphics) writeOAM(address uint16, value byte) {
 
 func (graphic *Graphics) getFromMemory(address uint16) uint8 {
 	switch {
-	case address >= VRAM_START && address <= VRAM_END:
-		return graphic.readVRAM(address)
-	case address >= OAM_START && address <= OAM_END:
-		return graphic.readOAM(address)
+	//case address >= VRAM_START && address <= VRAM_END:
+	//	return graphic.readVRAM(address)
+	//case address >= OAM_START && address <= OAM_END:
+	//	return graphic.readOAM(address)
 	case address == 0xFF44:
 		return graphic.LY
 	case address == 0xFF45:
@@ -333,10 +336,10 @@ func (graphic *Graphics) setLCDC(value uint8) {
 
 func (graphic *Graphics) set(address uint16, value uint8) {
 	switch {
-	case address >= VRAM_START && address <= VRAM_END:
-		graphic.writeVRAM(address, value)
-	case address >= OAM_START && address <= OAM_END:
-		graphic.writeOAM(address, value)
+	//case address >= VRAM_START && address <= VRAM_END:
+	//	graphic.writeVRAM(address, value)
+	//case address >= OAM_START && address <= OAM_END:
+	//	graphic.writeOAM(address, value)
 	case address == 0xFF44:
 		graphic.LY = value
 	case address == 0xFF45:
@@ -609,83 +612,241 @@ func (graphic *Graphics) renderScanline() {
 	}
 }
 
+//func (graphic *Graphics) modesHandeling(tCycles int) {
+//	cpu := CPU{}
+//	fmt.Println("In modesHandeling")
+//	if graphic.LCDC&(1<<7) == 0 {
+//		return //LCD disabled
+//	}
+//	graphic.cycle += tCycles
+//	LYCSelect, mode2, mode1, mode0, _, _ := graphic.lcdStatusBits()
+//	// at a time total amount of 80 T-Cycles
+//	for graphic.cycle >= 80 {
+//		switch graphic.mode {
+//		case MODE_OAMSCAN:
+//			//mode 2 80 cycles
+//			if graphic.cycle >= 80 {
+//				graphic.mode = MODE_DRAWING
+//				graphic.cycle -= 80
+//
+//			}
+//			if mode2 != 0 {
+//				// handle m2 interrupt
+//				cpu.IF |= 1 << 1
+//
+//			}
+//
+//		case MODE_DRAWING:
+//			//mode 3 172-289 cycles
+//			if graphic.cycle >= 172 {
+//				graphic.mode = MODE_HBLANK
+//				graphic.cycle -= 172
+//				graphic.renderScanline()
+//
+//			}
+//
+//		case MODE_HBLANK:
+//			// mide 0 87-204cycles
+//			if graphic.cycle >= 204 {
+//				graphic.cycle -= 204
+//				graphic.LY++
+//
+//				if graphic.LY == SCANLINES_PER_FRAME {
+//					//enter VBlank
+//					graphic.mode = MODE_VBLANK
+//					// hanfle vblank interrupt
+//					cpu.IF |= 1 << 0
+//				} else {
+//					graphic.mode = MODE_OAMSCAN // start next scanline
+//				}
+//			}
+//			if mode0 != 0 {
+//				// handle m0 interrupt
+//				cpu.IF |= 1 << 1
+//			}
+//
+//		case MODE_VBLANK:
+//			//mode 1 4560 cycles
+//			if graphic.cycle >= CYCLES_PER_LINE {
+//				graphic.LY++
+//				graphic.cycle -= CYCLES_PER_LINE
+//				if graphic.LY > TOTAL_LINES-1 { //end of vblank
+//					graphic.LY = 0
+//					graphic.mode = MODE_OAMSCAN // start new scanline
+//
+//				}
+//			}
+//			if mode1 != 0 {
+//				// handle m1 interrupt
+//				cpu.IF |= 1 << 1
+//			}
+//		}
+//		if graphic.LY == graphic.LYC {
+//			//set stat bit 2
+//			graphic.STAT |= 1 << 2
+//			if LYCSelect != 0 {
+//				cpu.IF |= 1 << 1
+//			}
+//		}
+//	}
+//
+//}
+
+//func (graphic *Graphics) modesHandeling(tCycles int) {
+//	//fmt.Println("In modesHandeling with graphics at ", graphic)
+//	//fmt.Println("graphics.cpu", graphic.cpu)
+//	fmt.Println("mode handleing")
+//	if graphic.cpu == nil {
+//		fmt.Println("Error: graphics.cpu is nil")
+//		return
+//	}
+//	if graphic.LCDC&(1<<7) == 0 {
+//		fmt.Println("LCD Disabled!")
+//		return
+//	}
+//	fmt.Println("Before for loop: Entering with tCycles: ", tCycles, " current cycle: ", graphic.cycle, " mode: ", graphic.mode)
+//
+//	graphic.cycle += tCycles
+//	fmt.Println("after adding cycle -> total: ", graphic.cycle, " added cycles: ", tCycles)
+//	fmt.Println("Check reset -> LY: ", graphic.LY, " mode: ", graphic.mode, " cycles total now: ", graphic.cycle)
+//	//LYCSelect, mode2, mode1, mode0, _, _ := graphic.lcdStatusBits()
+//	LYCSelect, mode2, _, mode0, _, _ := graphic.lcdStatusBits()
+//
+//	for graphic.cycle >= 80 {
+//		fmt.Println("Cycle Count:", graphic.cycle, "Mode:", graphic.mode)
+//
+//		switch graphic.mode {
+//		case MODE_OAMSCAN:
+//			if graphic.cycle >= 80 {
+//				//graphic.cycle -= 80
+//				graphic.mode = MODE_DRAWING
+//
+//				fmt.Println("Switching to DRAWING mode")
+//			}
+//			if mode2 != 0 {
+//				graphic.cpu.IF |= 1 << 1
+//				graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
+//			}
+//
+//		case MODE_DRAWING:
+//			//requiredCycles := max(172, graphic.cycle-80)
+//			//if graphic.cycle >= requiredCycles {
+//			fmt.Printf("mode 3 -> LY: %d, cylces: %d", graphic.LY, graphic.cycle)
+//			if graphic.cycle >= 172 {
+//				//graphic.cycle -= 172
+//				graphic.mode = MODE_HBLANK
+//
+//				fmt.Println("Switching to HBLANK mode")
+//				graphic.renderScanline()
+//			}
+//
+//		case MODE_HBLANK:
+//			//if graphic.cycle >= 204 {
+//			if graphic.cycle >= (456 - 80 - 172) {
+//				//graphic.cycle -= 204
+//				//graphic.cycle -= (456 - 80 - 172)
+//				graphic.LY++
+//				graphic.cpu.memoryWrite(0xFF44, graphic.LY)
+//
+//				if graphic.LY == SCANLINES_PER_FRAME {
+//					graphic.mode = MODE_VBLANK
+//					fmt.Println("Entering VBLANK")
+//					graphic.cpu.IF |= 1 << 0
+//					graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
+//
+//				} else {
+//					graphic.mode = MODE_OAMSCAN
+//				}
+//			}
+//			if mode0 != 0 {
+//				graphic.cpu.IF |= 1 << 1
+//				graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
+//
+//			}
+//
+//		case MODE_VBLANK:
+//			if graphic.cycle >= CYCLES_PER_LINE {
+//				graphic.LY++
+//				graphic.cpu.memoryWrite(0xFF44, graphic.LY)
+//
+//				//graphic.cycle -= CYCLES_PER_LINE
+//
+//				if graphic.LY > TOTAL_LINES-1 {
+//					fmt.Println("Exiting VBLANK, starting new frame")
+//					graphic.LY = 0
+//					graphic.cpu.memoryWrite(0xFF44, graphic.LY)
+//
+//					graphic.mode = MODE_OAMSCAN
+//				}
+//			}
+//			//if mode1 != 0 {
+//			//	graphic.cpu.IF |= 1 << 1
+//			//	graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
+//			//
+//			//}
+//		default:
+//			fmt.Println("Unknown mode: ", graphic.mode)
+//		}
+//
+//		if graphic.LY == graphic.LYC {
+//			graphic.STAT |= 1 << 2
+//			graphic.cpu.memoryWrite(0xFF41, graphic.STAT) //update STAT reg
+//			if LYCSelect != 0 {
+//				graphic.cpu.IF |= 1 << 1
+//				graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
+//
+//			}
+//		}
+//	}
+//}
+
 func (graphic *Graphics) modesHandeling(tCycles int) {
-	cpu := CPU{}
+	fmt.Println("mode handleing")
+	if graphic.cpu == nil {
+		fmt.Println("Error: graphics.cpu is nil")
+		return
+	}
 	if graphic.LCDC&(1<<7) == 0 {
-		return //LCD disabled
+		fmt.Println("LCD Disabled!")
+		graphic.mode = MODE_HBLANK
+		graphic.cycle = 0
+		return
 	}
+	fmt.Println("Before : Entering with tCycles: ", tCycles, " current cycle: ", graphic.cycle, " mode: ", graphic.mode)
 	graphic.cycle += tCycles
-	LYCSelect, mode2, mode1, mode0, _, _ := graphic.lcdStatusBits()
-	// at a time total amount of 80 T-Cycles
-	for graphic.cycle >= 80 {
-		switch graphic.mode {
-		case MODE_OAMSCAN:
-			//mode 2 80 cycles
-			if graphic.cycle >= 80 {
-				graphic.mode = MODE_DRAWING
-				graphic.cycle -= 80
 
-			}
-			if mode2 != 0 {
-				// handle m2 interrupt
-				cpu.IF |= 1 << 1
-
-			}
-
-		case MODE_DRAWING:
-			//mode 3 172-289 cycles
-			if graphic.cycle >= 172 {
-				graphic.mode = MODE_HBLANK
-				graphic.cycle -= 172
-				graphic.renderScanline()
-
-			}
-
-		case MODE_HBLANK:
-			// mide 0 87-204cycles
-			if graphic.cycle >= 204 {
-				graphic.cycle -= 204
-				graphic.LY++
-
-				if graphic.LY == SCANLINES_PER_FRAME {
-					//enter VBlank
-					graphic.mode = MODE_VBLANK
-					// hanfle vblank interrupt
-					cpu.IF |= 1 << 0
-				} else {
-					graphic.mode = MODE_OAMSCAN // start next scanline
-				}
-			}
-			if mode0 != 0 {
-				// handle m0 interrupt
-				cpu.IF |= 1 << 1
-			}
-
-		case MODE_VBLANK:
-			//mode 1 4560 cycles
-			if graphic.cycle >= CYCLES_PER_LINE {
-				graphic.LY++
-				graphic.cycle -= CYCLES_PER_LINE
-				if graphic.LY > TOTAL_LINES-1 { //end of vblank
-					graphic.LY = 0
-					graphic.mode = MODE_OAMSCAN // start new scanline
-
-				}
-			}
-			if mode1 != 0 {
-				// handle m1 interrupt
-				cpu.IF |= 1 << 1
-			}
+	if int(graphic.LY) >= SCANLINES_PER_FRAME {
+		fmt.Println("Entering Vblank")
+		graphic.mode = MODE_VBLANK
+		if graphic.LY == SCANLINES_PER_FRAME {
+			graphic.cpu.IF |= 1 << 0
+			graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
 		}
-		if graphic.LY == graphic.LYC {
-			//set stat bit 2
-			graphic.STAT |= 1 << 2
-			if LYCSelect != 0 {
-				cpu.IF |= 1 << 1
-			}
+	} else {
+		if graphic.cycle >= 456-80 {
+			fmt.Println("Entering oam scan")
+			graphic.mode = MODE_OAMSCAN
+		} else if graphic.cycle >= 456-80-172 {
+			fmt.Println("Entering drawing mode")
+			graphic.mode = MODE_DRAWING
+			graphic.renderScanline()
+		} else {
+			fmt.Println("Entering Hblank")
+			graphic.mode = MODE_HBLANK
+		}
+
+	}
+	if graphic.cycle >= CYCLES_PER_LINE {
+		graphic.cycle -= CYCLES_PER_LINE
+		graphic.LY++
+
+		if graphic.LY > TOTAL_LINES-1 {
+			graphic.LY = 0
+			fmt.Println("reset ly, start new frame")
 		}
 	}
 
+	fmt.Printf("LY: %d Cycles: %d mode: %d  \n", graphic.LY, graphic.cycle, graphic.mode)
 }
 
 func (graphic *Graphics) testPixelDrawing() {
