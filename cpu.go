@@ -12,15 +12,16 @@ import (
 type CPU struct {
 	Registers Registers
 	Memory    [65536]uint8
+	timer     Timer
 	Cartridge *Cartridge
-	Graphics  *Graphics
+	graphics  *Graphics
 	//OpcodesTable map[string]map[string][]map[string]string
 	IME          bool // interrupt master enable
 	IMEScheduled bool //enable IME after one instr
 	halted       bool
 	stopped      bool
-	IE           uint8
-	IF           uint8
+	IE           uint8 // FFFF — IE: Interrupt enable
+	IF           uint8 //FF0F — IF: Interrupt flag
 }
 type Registers struct {
 	A, B, C, D, E, F, H, L uint8
@@ -35,6 +36,64 @@ const flagZ uint8 = 1 << 7 // zero flag
 const flagN uint8 = 1 << 6 // sub flag
 const flagH uint8 = 1 << 5 // half carry flag
 const flagC uint8 = 1 << 4 // carry flag
+
+func NewCPU() *CPU {
+	cpu := &CPU{}
+
+	cpu.graphics = NewGraphics()
+	cpu.graphics.cpu = cpu
+
+	//fmt.Println("cpu.grahics", cpu.graphics)
+	//fmt.Println("cpu.grahics.cpu", cpu.graphics.cpu)
+	cpu.Registers.PC = 0x100
+	cpu.Registers.setAF(0x01B0)
+	cpu.Registers.setBC(0x0013)
+	cpu.Registers.setDE(0x00D8)
+	cpu.Registers.setHL(0x014D)
+	cpu.Registers.SP = 0xFFFE
+
+	// Timer and divider
+	cpu.Memory[0xFF05] = 0x00 // TIMA: Timer counter
+	cpu.Memory[0xFF06] = 0x00 // TMA: Timer modulo
+	cpu.Memory[0xFF07] = 0x00 // TAC: Timer control
+
+	//Audio
+	cpu.Memory[0xFF10] = 0x80 //NR10: Channel 1 sweep
+	cpu.Memory[0xFF11] = 0xBF //NR11: Channel 1 length timer & duty cycle
+	cpu.Memory[0xFF12] = 0xF3 // NR12: Channel 1 volume & envelope
+	cpu.Memory[0xFF14] = 0xBF // NR14: Channel 1 period high & control
+	cpu.Memory[0xFF16] = 0x3F //NR21 ($FF16) → NR11
+	cpu.Memory[0xFF17] = 0x00 //NR22 ($FF17) → NR12
+	cpu.Memory[0xFF19] = 0xBF // NR24 ($FF19) → NR14
+	cpu.Memory[0xFF1A] = 0x7F //NR30: Channel 3 DAC enable
+	cpu.Memory[0xFF1B] = 0xFF // NR31: Channel 3 length timer [write-only]
+	cpu.Memory[0xFF1C] = 0x9F // NR32: Channel 3 output level
+	cpu.Memory[0xFF1E] = 0xBF // NR34: Channel 3 period high & control
+	cpu.Memory[0xFF20] = 0xFF //NR41: Channel 4 length timer [write-only]
+	cpu.Memory[0xFF21] = 0x00 // NR42: Channel 4 volume & envelope
+	cpu.Memory[0xFF22] = 0x00 // NR43: Channel 4 frequency & randomness
+	cpu.Memory[0xFF23] = 0xBF // NR44: Channel 4 control
+	cpu.Memory[0xFF24] = 0x77 // NR50: Master volume & VIN panning
+	cpu.Memory[0xFF25] = 0xF3 // NR51: Sound panning
+	cpu.Memory[0xFF26] = 0xF1 //NR52: Audio master control
+
+	cpu.Memory[0xFF40] = 0x91 // LCDC
+	cpu.Memory[0xFF42] = 0x00 //SCY
+	cpu.Memory[0xFF43] = 0x00 // SCX
+
+	cpu.Memory[0xFF45] = 0x00 //LYC
+	cpu.Memory[0xFF47] = 0xFC //BGP
+	cpu.Memory[0xFF48] = 0xFF //OBP0
+	cpu.Memory[0xFF49] = 0xFF // OBP1
+
+	cpu.Memory[0xFF4A] = 0x00 //WY
+	cpu.Memory[0xFF4B] = 0x00 // WX
+
+	cpu.Memory[0xFFFF] = 0x00 //IE
+
+	return cpu
+
+}
 
 func (register *Registers) setFlag(flag uint8, on bool) {
 	//var register Registers
@@ -109,10 +168,13 @@ func (cpu *CPU) getImmediate8() uint8 {
 	return val
 }
 
-func (cpu *CPU) getImmediate16() uint8 {
-	val := cpu.Memory[cpu.Registers.PC]
+func (cpu *CPU) getImmediate16() uint16 {
+	//val := cpu.Memory[cpu.Registers.PC]
+	val1 := cpu.Memory[cpu.Registers.PC]
+	val2 := cpu.Memory[cpu.Registers.PC+1]
+	res := uint16(val1) | uint16(val2)<<8
 	cpu.Registers.PC += 2
-	return val
+	return res
 }
 
 func (cpu *CPU) setINCFlags(reg uint8, flags map[string]string) {
@@ -143,14 +205,13 @@ func (cpu *CPU) setDECFlags(reg uint8, flags map[string]string) {
 
 func (cpu *CPU) fetchOpcode() uint8 {
 	opcode := cpu.Memory[cpu.Registers.PC]
-	// fmt.Println("Opcode in fetch:", opcode)
 	cpu.Registers.PC++
 	return opcode
 }
 
 func (cpu *CPU) fetchCBOpcode() uint8 {
 	cbOpcode := cpu.Memory[cpu.Registers.PC]
-	// fmt.Println("CB Opcode in fetch:", cbOpcode)
+	fmt.Printf("CB Opcode in fetch: 0x%02X", cbOpcode)
 	cpu.Registers.PC++
 	return cbOpcode
 }
@@ -164,12 +225,15 @@ func (cpu *CPU) push(n uint16) {
 	cpu.Registers.SP -= 2
 }
 
-func (cpu *CPU) pop(n uint16) {
+func (cpu *CPU) pop() uint16 {
+	lo := uint16(cpu.Memory[cpu.Registers.SP])
+	hi := uint16(cpu.Memory[cpu.Registers.SP+1])
+	fmt.Printf("POP -> lower: 0x%02X and highrr: 0x%02X\n", lo, hi)
 	cpu.Registers.SP += 2
-	hi := cpu.Memory[cpu.Registers.SP+1]
-	lo := cpu.Memory[cpu.Registers.SP]
-	res := uint16(hi)<<8 | uint16(lo)
-	n = res
+
+	//res := uint16(hi)<<8 | uint16(lo)
+	//n = res
+	return hi<<8 | lo
 
 }
 
@@ -177,10 +241,19 @@ func (cpu *CPU) execRST(address uint16) {
 	// Push present address onto stack.
 	// Jump to address $0000 + n.
 	cpu.Registers.SP -= 2
-	cpu.Memory[cpu.Registers.SP] = uint8(cpu.Registers.PC & 0xFF)          //lower byte
+	fmt.Printf("RST- SP before: 0x%04X\n", cpu.Registers.SP)
+	cpu.Memory[cpu.Registers.SP] = uint8(cpu.Registers.PC & 0xFF) //lower byte
+	fmt.Printf("RST- SP after: 0x%04X\n", cpu.Registers.SP)
+	fmt.Printf("RST- SP+1 before: 0x%04X\n", cpu.Registers.SP+1)
 	cpu.Memory[cpu.Registers.SP+1] = uint8((cpu.Registers.PC >> 8) & 0xFF) //upper byte
+	fmt.Printf("RST- SP+1 after: 0x%04X\n", cpu.Registers.SP+1)
 
+	fmt.Printf("Pc before  0x%04X sp = 0x%04X\n", cpu.Registers.PC, cpu.Registers.SP)
+	fmt.Printf("Right before jumping to 0x%04X Pushing PC: 0x%04X to Stack at SP: 0x%04X\n",
+		address, cpu.Registers.PC, cpu.Registers.SP)
 	cpu.Registers.PC = address
+	fmt.Printf("Pc after  0x%04X sp = 0x%04X\n", cpu.Registers.PC, cpu.Registers.SP)
+
 }
 
 func (cpu *CPU) execBIT(reg uint8, bit uint8) {
@@ -459,6 +532,35 @@ func (cpu *CPU) handleInterruptions() {
 //	}
 //}
 
+func (cpu *CPU) memoryWrite(address uint16, value byte) {
+	//TODO: add more if they exist
+	if address >= 0xFF04 && address <= 0xFF07 {
+		cpu.timer.Write(address, value)
+	} else if address >= VRAM_START && address <= VRAM_END {
+		cpu.graphics.writeVRAM(address, value)
+	} else if address >= OAM_START && address <= OAM_END {
+		cpu.graphics.writeOAM(address, value)
+	} else if address >= 0xFF40 && address <= 0xFF4B {
+		cpu.graphics.set(address, value)
+	} else {
+		cpu.Memory[address] = value
+	}
+}
+
+func (cpu *CPU) memoryRead(address uint16) byte {
+	if address >= 0xFF04 && address <= 0xFF07 {
+		return cpu.timer.Read(address)
+	} else if address >= VRAM_START && address <= VRAM_END {
+		return cpu.graphics.readVRAM(address)
+	} else if address >= OAM_START && address <= OAM_END {
+		return cpu.graphics.readOAM(address)
+	} else if address >= 0xFF40 && address <= 0xFF4B {
+		return cpu.graphics.getFromMemory(address)
+	} else {
+		return cpu.Memory[address]
+	}
+}
+
 func (cpu *CPU) execOpcodes() int {
 	if cpu.halted {
 		return 0
@@ -467,9 +569,12 @@ func (cpu *CPU) execOpcodes() int {
 		return 0
 	}
 	var tCycles int
-	cpu.handleInterruptions()
+	fmt.Printf("Before instructiins => PC: 0x%04X | Memory[0x0039]: 0x%02X\n", cpu.Registers.PC, cpu.Memory[0x0039])
+	//cpu.handleInterruptions()
 	// fmt.Printf("Executing opcode: 0x%02X\n", opcode)
 	opcode := cpu.fetchOpcode()
+	fmt.Printf("Opcode in fetch: 0x%X ; PC now:  0x%02X ; SP now: 0x%02X\n", opcode, cpu.Registers.PC, cpu.Registers.SP)
+	
 	//fmt.Printf("pc: 0x%04X and opcode: 0x%02X\n", cpu.Registers.PC, opcode)
 	switch opcode {
 	case 0b1: // 0x01 -> LD BC, imm16
@@ -528,12 +633,17 @@ func (cpu *CPU) execOpcodes() int {
 		// If flagZ is not set then add n to current
 		// address and jump to it
 		n := cpu.getImmediate8()
+		fmt.Printf("Immediate 8 in 0x20: 0x%04X\n", n)
 		if !cpu.Registers.getFlag(flagZ) {
 			cpu.Registers.PC += uint16(n)
+			tCycles = 12
+
+		} else {
+			tCycles = 20
+
 		}
 		fmt.Printf(string(flagZ))
 		fmt.Printf(string(n))
-		tCycles = 20
 
 	case 0b100001: // 0x21 -> LD HL, n16
 		cpu.Registers.setHL(uint16(cpu.getImmediate16()))
@@ -554,10 +664,12 @@ func (cpu *CPU) execOpcodes() int {
 		n := cpu.getImmediate8()
 		if cpu.Registers.getFlag(flagZ) {
 			cpu.Registers.PC += uint16(n)
+			tCycles = 12
+		} else {
+			tCycles = 8
 		}
 		fmt.Printf(string(flagZ))
 		fmt.Printf(string(n))
-		tCycles = 20
 
 	case 0b101001: // 0x29 -> ADD HL, HL
 		cpu.Registers.setHL(cpu.Registers.getHL() + cpu.Registers.getHL())
@@ -578,8 +690,11 @@ func (cpu *CPU) execOpcodes() int {
 		n := cpu.getImmediate8()
 		if !cpu.Registers.getFlag(flagC) {
 			cpu.Registers.PC += uint16(n)
+			tCycles = 12
+		} else {
+			tCycles = 8
+
 		}
-		tCycles = 20
 
 	case 0b110001: // 0x31 -> LD SP, n16
 		cpu.Registers.SP = uint16(cpu.getImmediate16())
@@ -600,8 +715,10 @@ func (cpu *CPU) execOpcodes() int {
 		n := cpu.getImmediate8()
 		if cpu.Registers.getFlag(flagC) {
 			cpu.Registers.PC += uint16(n)
+			tCycles = 12
+		} else {
+			tCycles = 8
 		}
-		tCycles = 20
 
 	case 0b111001: // 0x39 -> ADD HL, SP
 		cpu.Registers.setHL(cpu.Registers.getHL() + (cpu.Registers.SP))
@@ -1249,8 +1366,10 @@ func (cpu *CPU) execOpcodes() int {
 		n := cpu.getImmediate16()
 		if !cpu.Registers.getFlag(flagZ) {
 			cpu.Registers.PC = uint16(n)
+			tCycles = 16
+		} else {
+			tCycles = 12
 		}
-		tCycles = 28
 
 	case 0b11000100: // 0xC4 -> CALL NZ, imm16
 		//Push address of next instruction onto stack and then
@@ -1259,8 +1378,10 @@ func (cpu *CPU) execOpcodes() int {
 		if !cpu.Registers.getFlag(flagZ) {
 			cpu.push(cpu.Registers.PC)
 			cpu.Registers.PC = uint16(n)
+			tCycles = 24
+		} else {
+			tCycles = 12
 		}
-		tCycles = 36
 
 	case 0b11000110: // 0xC6 -> ADD A, imm8
 		cpu.Registers.A += cpu.getImmediate8()
@@ -1271,8 +1392,12 @@ func (cpu *CPU) execOpcodes() int {
 		n := cpu.getImmediate16()
 		if cpu.Registers.getFlag(flagZ) {
 			cpu.Registers.PC = uint16(n)
+			tCycles = 16
+
+		} else {
+			tCycles = 12
+
 		}
-		tCycles = 28
 
 	case 0b11001100: // 0xCC -> CALL Z, imm16
 		//Push address of next instruction onto stack and then
@@ -1281,8 +1406,11 @@ func (cpu *CPU) execOpcodes() int {
 		if cpu.Registers.getFlag(flagZ) {
 			cpu.push(cpu.Registers.PC)
 			cpu.Registers.PC = uint16(n)
+			tCycles = 24
+		} else {
+			tCycles = 12
+
 		}
-		tCycles = 36
 
 	case 0b11001110: // 0xCE -> ADC A, imm8
 		carry := uint8(1)
@@ -1295,8 +1423,11 @@ func (cpu *CPU) execOpcodes() int {
 		n := cpu.getImmediate16()
 		if !cpu.Registers.getFlag(flagC) {
 			cpu.Registers.PC = uint16(n)
+			tCycles = 16
+		} else {
+			tCycles = 12
+
 		}
-		tCycles = 28
 
 	case 0b11010100: // 0xD4 -> CALL NC, imm16
 		//Push address of next instruction onto stack and then
@@ -1305,8 +1436,11 @@ func (cpu *CPU) execOpcodes() int {
 		if !cpu.Registers.getFlag(flagC) {
 			cpu.push(cpu.Registers.PC)
 			cpu.Registers.PC = uint16(n)
+			tCycles = 24
+		} else {
+			tCycles = 12
+
 		}
-		tCycles = 36
 
 	case 0b11010110: // 0xD6 -> SUB A, imm8
 		cpu.Registers.A -= cpu.getImmediate8()
@@ -1317,8 +1451,12 @@ func (cpu *CPU) execOpcodes() int {
 		n := cpu.getImmediate16()
 		if cpu.Registers.getFlag(flagC) {
 			cpu.Registers.PC = uint16(n)
+			tCycles = 20
+
+		} else {
+			tCycles = 8
+
 		}
-		tCycles = 28
 
 	case 0b11011100: // 0xDC -> CALL C, imm16
 		//Push address of next instruction onto stack and then
@@ -1327,8 +1465,12 @@ func (cpu *CPU) execOpcodes() int {
 		if cpu.Registers.getFlag(flagC) {
 			cpu.push(cpu.Registers.PC)
 			cpu.Registers.PC = uint16(n)
+			tCycles = 24
+
+		} else {
+			tCycles = 12
+
 		}
-		tCycles = 36
 
 	case 0b11011110: // 0xDE -> SBC A, imm8
 		carry := uint8(1)
@@ -1458,6 +1600,7 @@ func (cpu *CPU) execOpcodes() int {
 
 	case 0b11000: // 0x18 -> JR e8
 		n := cpu.getImmediate8()
+		fmt.Printf("Immediate 8 at 0x18: 0x%04X\n", n)
 		cpu.Registers.PC += uint16(n)
 		tCycles = 12
 
@@ -1547,16 +1690,21 @@ func (cpu *CPU) execOpcodes() int {
 
 		//Pop two bytes from stack & jump to that address if flagZ not set
 		if !cpu.Registers.getFlag(flagZ) {
-			cpu.pop(cpu.Registers.PC)
+			cpu.Registers.PC = cpu.pop()
+			tCycles = 20
+
+		} else {
+			tCycles = 8
 		}
-		tCycles = 28
 
 	case 0b11000001: // 0xC1 -> POP BC
-		cpu.pop(cpu.Registers.getBC())
+		//cpu.pop(cpu.Registers.getBC())
+		cpu.Registers.setBC(cpu.pop())
 		tCycles = 12
 
 	case 0b11000011: // 0xC3 -> JP imm16
 		n := cpu.getImmediate16()
+		fmt.Printf("Immediate value 0x%02X at PC: 0x%02X\n ", n, cpu.Registers.PC)
 		cpu.Registers.PC = uint16(n)
 		tCycles = 16
 
@@ -1571,9 +1719,13 @@ func (cpu *CPU) execOpcodes() int {
 	case 0b11001000: // 0xC8 -> RET Z
 		//Pop two bytes from stack & jump to that address if flagZ set
 		if cpu.Registers.getFlag(flagZ) {
-			cpu.pop(cpu.Registers.PC)
+			cpu.Registers.PC = cpu.pop()
+			tCycles = 20
+
+		} else {
+			tCycles = 8
+
 		}
-		tCycles = 28
 
 	case 0b11001101: // 0xCD -> CALL imm16
 		n := cpu.getImmediate16()
@@ -1588,12 +1740,16 @@ func (cpu *CPU) execOpcodes() int {
 	case 0b11010000: // 0xD0 -> RET NC
 		//Pop two bytes from stack & jump to that address if flagC not set
 		if !cpu.Registers.getFlag(flagC) {
-			cpu.pop(cpu.Registers.PC)
+			cpu.Registers.PC = cpu.pop()
+			tCycles = 20
+
+		} else {
+			tCycles = 8
+
 		}
-		tCycles = 28
 
 	case 0b11010001: // 0xD1 -> POP DE
-		cpu.pop(cpu.Registers.getDE())
+		cpu.Registers.setDE(cpu.pop())
 		tCycles = 12
 
 	case 0b11010101: // 0xD5 -> PUSH DE
@@ -1607,16 +1763,20 @@ func (cpu *CPU) execOpcodes() int {
 	case 0b11011000: // 0xD8 -> RET C
 		//Pop two bytes from stack & jump to that address if flagC set
 		if cpu.Registers.getFlag(flagC) {
-			cpu.pop(cpu.Registers.PC)
+			cpu.Registers.PC = cpu.pop()
+			tCycles = 20
+
+		} else {
+			tCycles = 8
+
 		}
-		tCycles = 28
 
 	case 0b11011111: // 0xDF -> RST $18
 		cpu.execRST(0x18)
 		tCycles = 16
 
 	case 0b11100001: // 0xE1 -> POP HL
-		cpu.pop(cpu.Registers.getHL())
+		cpu.Registers.setHL(cpu.pop())
 		tCycles = 12
 
 	case 0b11100101: // 0xE5 -> PUSH HL
@@ -1637,7 +1797,7 @@ func (cpu *CPU) execOpcodes() int {
 		tCycles = 16
 
 	case 0b11110001: // 0xF1 -> POP AF
-		cpu.pop(cpu.Registers.getAF())
+		cpu.Registers.setAF(cpu.pop())
 		tCycles = 12
 
 	case 0b11110101: // 0xF5 -> PUSH AF
@@ -1756,7 +1916,8 @@ func (cpu *CPU) execOpcodes() int {
 		tCycles = 4
 
 	case 0b11001001: // 0xC9 -> RET
-		cpu.pop(cpu.Registers.PC)
+		cpu.Registers.PC = cpu.pop()
+		fmt.Printf("RET-> PC=0x%02X\n", cpu.Registers.PC)
 		tCycles = 16
 
 	case 0b11001011: // 0xCB -> PREFIX
@@ -2306,6 +2467,7 @@ func (cpu *CPU) execOpcodes() int {
 
 		case 0b10000111: // 0x87 -> RES 0, A
 			cpu.execRES(cpu.Registers.A, 0)
+			fmt.Printf("Now executing RES at 0x87")
 			tCycles = 8
 
 		case 0b10001000: // 0x88 -> RES 1, B
@@ -2797,8 +2959,15 @@ func (cpu *CPU) execOpcodes() int {
 
 		//Pop two bytes from stack & jump to that address then
 		// enable interrupts.
-		cpu.pop(cpu.Registers.PC)
+		for i := 0; i < 8; i += 2 {
+			fmt.Printf("Stack[SP+%d]: 0x%02X%02X\n", i, cpu.Memory[cpu.Registers.SP+uint16(i)+1], cpu.Memory[cpu.Registers.SP+uint16(i)])
+		}
+		fmt.Printf("SP before RETI : 0x%04X\n", cpu.Registers.SP)
+		fmt.Printf("Stack[SP]: 0x%02X, Stack[SP+1] : 0x%02X\n", cpu.Memory[cpu.Registers.SP], cpu.Memory[cpu.Registers.SP+1])
+
+		cpu.Registers.PC = cpu.pop()
 		cpu.IME = true
+		fmt.Printf("RETI -> PC: 0x%04X\n", cpu.Registers.PC)
 		tCycles = 16
 
 	case 0b11011011: // 0xDB -> ILLEGAL_DB
@@ -2874,8 +3043,8 @@ func (cpu *CPU) loadROMFile(cartridge *Cartridge, graphic *Graphics) {
 	cpu.Registers.PC = 0x100
 }
 
-func (cpu *CPU) run() {
-	graphics := NewGraphics()
+func (cpu *CPU) run(graphics *Graphics) {
+	//graphics := NewGraphics()
 	if graphics.LCDC&(1<<7) == 0 {
 		return
 	}
