@@ -56,6 +56,7 @@ type Sprite struct {
 	x, y       int
 	tileIndex  byte
 	attributes byte
+	OAMOrder   int
 }
 type Graphics struct {
 	cpu     *CPU
@@ -182,11 +183,19 @@ func (graphic *Graphics) writeVRAM(address uint16, value byte) {
 
 }
 
-func (graphic *Graphics) readOAM(address uint16) byte {
-	if address >= OAM_START && address <= OAM_END {
-		return graphic.OAM[address]
+func (graphic *Graphics) dmaTransfer(value uint8) {
+	upper := uint16(value) << 8
+	for i := 0; i < OAM_SIZE; i++ {
+		graphic.OAM[i] = graphic.cpu.Memory[upper+uint16(i)]
+		fmt.Printf("DMA Transfer ->  %04X - %02X\n ", i, graphic.OAM[i])
 	}
-	return 0
+}
+
+func (graphic *Graphics) readOAM(address uint16) byte {
+	//if address >= OAM_START && address <= OAM_END {
+	return graphic.OAM[address-OAM_START]
+	//}
+	//return 0
 }
 
 func (graphic *Graphics) writeOAM(address uint16, value byte) {
@@ -367,6 +376,21 @@ func (graphic *Graphics) set(address uint16, value uint8) {
 
 }
 
+func (cpu *CPU) readTileData(address uint16) [8][8]uint8 {
+	var tile [8][8]uint8
+	for row := 0; row < 8; row++ {
+		low := cpu.memoryRead(address + uint16(row*2))
+		high := cpu.memoryRead(address + uint16(row*2) + 1)
+
+		for col := 0; col < 8; col++ {
+			bit := 7 - col
+			color := ((high>>bit)&1)<<1 | ((low >> bit) & 1)
+			tile[row][col] = uint8(color)
+		}
+	}
+	return tile
+}
+
 // sprites tiles
 // OAM scan - mode 2
 func (graphic *Graphics) spritesOAM() [width]uint8 {
@@ -401,19 +425,22 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 	// display up to 40 movable objects (or sprites)
 	for i := 0; i < 40; i++ {
 		// each sprite consists of 4 bytes
-		spriteAddr := i * 4
+		spriteAddr := OAM_START + i*4
+		fmt.Println("spriteAddr is", spriteAddr)
 
 		//Byte 0 — Y Position
 		//Y = Object’s vertical position on the screen + 16
-		y := int(graphic.OAM[spriteAddr]) - 16
+		//y := int(graphic.OAM[spriteAddr]) - 16
+		y := int(graphic.cpu.memoryRead(uint16(spriteAddr))) - 16
 
 		//Byte 1 — X Position
 		//X = Object’s horizontal position on the screen + 8.
-		x := int(graphic.OAM[spriteAddr+1]) - 8
+		x := int(graphic.cpu.memoryRead(uint16(spriteAddr+1))) - 8
 
 		//Byte 2 — Tile Index
-		tileIndex := graphic.OAM[spriteAddr+2]
-		fmt.Printf("Tile index: %d\n", tileIndex)
+		//tileIndex := graphic.OAM[OAM_START + spriteAddr+2]
+		tileIndex := graphic.cpu.memoryRead(uint16(spriteAddr + 2))
+		//fmt.Printf("Tile index: %d\n", tileIndex)
 
 		if spriteSize == 16 {
 			tileIndex &= 0xFF // mask bit 0
@@ -422,19 +449,24 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 		//	continue
 		//}
 		//Byte 3 — Attributes/Flags
-		attributes := graphic.OAM[spriteAddr+3]
+		//attributes := graphic.OAM[spriteAddr+3]
+		attributes := graphic.cpu.memoryRead(uint16(spriteAddr + 3))
+		fmt.Printf("Sprite %d -> OAM Addr: 0x%04X | X: %d Y: %d | Tile Index: %d | Attributes: 0b%08b\n", i, spriteAddr, x, y, tileIndex, attributes)
 
 		//check if sprite is onscanline
-		if int(graphic.LY)+16 < y || int(graphic.LY)+16 > y+spriteSize-1 {
+		if int(graphic.LY) < y || int(graphic.LY) > y+spriteSize {
 			continue
 		}
 
-		visibleSprites = append(visibleSprites, Sprite{x, y, tileIndex, attributes})
+		visibleSprites = append(visibleSprites, Sprite{x, y, tileIndex, attributes, i})
 
 		// TODO: sort sprites by priority
 		// order by X (smaller X->bigger prority)
 		//if x the same => by OAM location order
 		sort.Slice(visibleSprites, func(i, j int) bool {
+			if visibleSprites[i].x == visibleSprites[j].x {
+				return visibleSprites[i].OAMOrder < visibleSprites[j].OAMOrder
+			}
 			return visibleSprites[i].x < visibleSprites[j].x
 		})
 
@@ -452,7 +484,10 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 			yFlip := sprite.attributes & (1 << 6)
 			xFlip := sprite.attributes & (1 << 5)
 
-			tileData := graphic.tileSet[sprite.tileIndex]
+			//tileData := graphic.tileSet[sprite.tileIndex]
+			tileAddress := 0x8000 + (int(sprite.tileIndex) * 16)
+			//tileData := graphic.cpu.readTileData(uint16(sprite.tileIndex))
+			tileData := graphic.cpu.readTileData(uint16(tileAddress))
 			fmt.Printf("Tile data: %d\n", tileData)
 
 			priority := attributes & (1 << 7)
@@ -462,6 +497,8 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 			tileY := graphic.LY - uint8(sprite.y)
 			if yFlip != 0 {
 				tileY = uint8(spriteSize) - 1 - graphic.LY - uint8(sprite.y)
+				//tileY = uint8(spriteSize) - 1 - uint8(sprite.y)
+
 			}
 
 			for col := 0; col < 8; col++ {
@@ -814,24 +851,34 @@ func (graphic *Graphics) modesHandeling(tCycles int) {
 	}
 	fmt.Println("Before : Entering with tCycles: ", tCycles, " current cycle: ", graphic.cycle, " mode: ", graphic.mode)
 	graphic.cycle += tCycles
+	//fmt.Println("after adding cycle -> total: ", graphic.cycle, " added cycles: ", tCycles)
 
 	if int(graphic.LY) >= SCANLINES_PER_FRAME {
-		fmt.Println("Entering Vblank")
+
 		graphic.mode = MODE_VBLANK
 		if graphic.LY == SCANLINES_PER_FRAME {
+			fmt.Println("Entering Vblank")
 			graphic.cpu.IF |= 1 << 0
 			graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
 		}
 	} else {
 		if graphic.cycle >= 456-80 {
-			fmt.Println("Entering oam scan")
+			if graphic.mode != MODE_OAMSCAN {
+				fmt.Println("Entering oam scan")
+
+			}
 			graphic.mode = MODE_OAMSCAN
 		} else if graphic.cycle >= 456-80-172 {
-			fmt.Println("Entering drawing mode")
+			if graphic.mode != MODE_DRAWING {
+				fmt.Println("Entering drawing mode")
+
+			}
 			graphic.mode = MODE_DRAWING
 			graphic.renderScanline()
 		} else {
-			fmt.Println("Entering Hblank")
+			if graphic.mode != MODE_HBLANK {
+				fmt.Println("Entering Hblank")
+			}
 			graphic.mode = MODE_HBLANK
 		}
 
