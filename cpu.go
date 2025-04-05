@@ -86,7 +86,7 @@ func NewCPU() *CPU {
 	cpu.Memory[0xFF48] = 0xFF //OBP0
 	cpu.Memory[0xFF49] = 0xFF // OBP1
 
-	cpu.Memory[0xFF4A] = 0x00 //WY
+	cpu.Memory[0xFF4A] = 0x00 // WY
 	cpu.Memory[0xFF4B] = 0x00 // WX
 
 	cpu.Memory[0xFFFF] = 0x00 //IE
@@ -540,7 +540,7 @@ func (cpu *CPU) memoryWrite(address uint16, value byte) {
 		cpu.graphics.writeVRAM(address, value)
 		fmt.Printf("VRAM write ->  address: 0x%02X, value: 0x%02X\n", address, value)
 	} else if address >= OAM_START && address <= OAM_END {
-		cpu.graphics.writeOAM(address, value)
+		cpu.graphics.writeOAM(address-OAM_START, value)
 		fmt.Printf("OAM write -> address: 0x%02X, value: 0x%02X\n", address, value)
 	} else if address >= 0xFF40 && address <= 0xFF4B {
 		cpu.graphics.set(address, value)
@@ -558,7 +558,7 @@ func (cpu *CPU) memoryRead(address uint16) byte {
 	} else if address >= VRAM_START && address <= VRAM_END {
 		return cpu.graphics.readVRAM(address)
 	} else if address >= OAM_START && address <= OAM_END {
-		return cpu.graphics.readOAM(address)
+		return cpu.graphics.readOAM(address - OAM_START)
 	} else if address >= 0xFF40 && address <= 0xFF4B {
 		return cpu.graphics.getFromMemory(address)
 	} else {
@@ -1712,7 +1712,7 @@ func (cpu *CPU) execOpcodes() int {
 
 	case 0b11000011: // 0xC3 -> JP imm16
 		n := cpu.getImmediate16()
-		fmt.Printf("Immediate value 0x%02X at PC: 0x%02X", n, cpu.Registers.PC)
+		fmt.Printf("Immediate value 0x%02X at PC: 0x%02X\n", n, cpu.Registers.PC)
 		cpu.Registers.PC = uint16(n)
 		tCycles = 16
 
@@ -3047,7 +3047,7 @@ func (cpu *CPU) execOpcodes() int {
 func (cpu *CPU) loadROMFile(cartridge *Cartridge, graphic *Graphics) {
 	cpu.Cartridge = cartridge
 	copy(cpu.Memory[:], cartridge.ROMdata)
-	copy(graphic.VRAM[:], cartridge.ROMdata[:VRAM_SIZE])
+	//copy(graphic.VRAM[:], cartridge.ROMdata[:VRAM_SIZE])
 	//copy(graphic.OAM[:], cartridge.ROMdata[OAM_START:OAM_END])
 	cpu.Registers.PC = 0x100
 }

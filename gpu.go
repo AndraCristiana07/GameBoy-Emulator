@@ -13,7 +13,7 @@ const bgWidth = 256
 const bgHeight = 256
 
 const VRAM_START = 0x8000
-const VRAM_END = 0x97FF
+const VRAM_END = 0x9FFF
 const VRAM_SIZE = VRAM_END - VRAM_START
 
 const OAM_START = 0xFE00
@@ -36,18 +36,16 @@ const SCANLINES_PER_FRAME = 144
 const VBLANK_LINES = 10
 const TOTAL_LINES = 154
 
-var colors = []rl.Color{rl.White, rl.LightGray, rl.DarkGray, rl.Black}
+var colors = [4]rl.Color{rl.White, rl.LightGray, rl.DarkGray, rl.Black}
 
-type TilePixleID uint8
+type TilePixelID uint8
 
 const (
-	zero TilePixleID = iota
+	zero TilePixelID = iota
 	one
 	two
 	three
 )
-
-//var tilePixleId uint8
 
 // tile = array of 8 rows where a row is an array of 8 TileValues
 type tile = [8][8]uint8
@@ -59,10 +57,10 @@ type Sprite struct {
 	OAMOrder   int
 }
 type Graphics struct {
-	cpu     *CPU
-	VRAM    [VRAM_SIZE]byte
-	OAM     [OAM_SIZE]byte //Object Attribute Memory
-	LCDC    byte           // LCD control
+	cpu *CPU
+	//VRAM    [VRAM_SIZE]byte
+	//OAM     [OAM_SIZE]byte // Object Attribute Memory
+	LCDC    byte // LCD control
 	tileSet [384]tile
 
 	LY   uint8 // FF44, value from 0-153
@@ -115,8 +113,8 @@ func NewGraphics() *Graphics {
 	//mode0 |= 0
 	//LYCeqLY |= 0
 	graphic.STAT = 0b00000001 //?
-	graphic.LCDC = 0b10010001 //?
-
+	graphic.LCDC = 0x91       //?
+	graphic.LCDC |= 1 << 1
 	graphic.WX = 0
 	graphic.WY = 0
 	graphic.SCX = 0
@@ -125,25 +123,25 @@ func NewGraphics() *Graphics {
 	graphic.OBP1 = 1
 	graphic.OBP0 = 0
 
-	for i := 0; i < VRAM_SIZE; i++ {
-		graphic.VRAM[i] = 0
-	}
-	for i := 0; i < OAM_SIZE; i++ {
-		graphic.OAM[i] = 0
-	}
+	//for i := 0; i < VRAM_SIZE; i++ {
+	//	graphic.VRAM[i] = 0
+	//}
+	//for i := 0; i < OAM_SIZE; i++ {
+	//	graphic.OAM[i] = 0
+	//}
 	return graphic
 }
 
 func (graphic *Graphics) readVRAM(address uint16) byte {
 	if address >= VRAM_START && address <= VRAM_END {
-		return graphic.VRAM[address-VRAM_START]
+		return graphic.cpu.Memory[address-VRAM_START]
 	}
 	return 0
 }
 
 func (graphic *Graphics) writeVRAM(address uint16, value byte) {
 	index := address - VRAM_START
-	graphic.VRAM[index] = value
+	graphic.cpu.Memory[index] = value
 	if index >= 0x1800 {
 		return
 	}
@@ -152,8 +150,8 @@ func (graphic *Graphics) writeVRAM(address uint16, value byte) {
 	normalizedIndex := index & 0xFFFE
 
 	// get bytes for tile row
-	byte1 := graphic.VRAM[normalizedIndex]
-	byte2 := graphic.VRAM[normalizedIndex+1]
+	byte1 := graphic.cpu.Memory[normalizedIndex]
+	byte2 := graphic.cpu.Memory[normalizedIndex+1]
 
 	//byte1 := graphic.readVRAM(normalizedIndex)
 	//byte2 := graphic.readVRAM(normalizedIndex + 1)
@@ -167,7 +165,7 @@ func (graphic *Graphics) writeVRAM(address uint16, value byte) {
 		lsb := byte1 & byte(mask) // first byte -> least significant bit
 		msb := byte2 & byte(mask) // second byte -> most significant bit
 		//var value byte
-		var pixelValue TilePixleID
+		var pixelValue TilePixelID
 		if lsb != 0 && msb != 0 {
 			//var tilepixelid = three
 			pixelValue = three
@@ -186,21 +184,23 @@ func (graphic *Graphics) writeVRAM(address uint16, value byte) {
 func (graphic *Graphics) dmaTransfer(value uint8) {
 	upper := uint16(value) << 8
 	for i := 0; i < OAM_SIZE; i++ {
-		graphic.OAM[i] = graphic.cpu.Memory[upper+uint16(i)]
-		fmt.Printf("DMA Transfer ->  %04X - %02X\n ", i, graphic.OAM[i])
+		graphic.cpu.Memory[i] = graphic.cpu.Memory[upper+uint16(i)]
+		fmt.Printf("DMA Transfer ->  %04X - %02X\n ", i, graphic.cpu.Memory[i])
 	}
 }
 
 func (graphic *Graphics) readOAM(address uint16) byte {
 	//if address >= OAM_START && address <= OAM_END {
-	return graphic.OAM[address-OAM_START]
+	return graphic.cpu.Memory[address]
 	//}
 	//return 0
 }
 
 func (graphic *Graphics) writeOAM(address uint16, value byte) {
 	//if address >= 0xFE00 && address <= 0xFE9F {
-	graphic.OAM[address] = value
+	graphic.cpu.Memory[address] = value
+
+	//graphic.OAM[address&0x009F] = value
 	//}
 }
 
@@ -378,6 +378,11 @@ func (graphic *Graphics) set(address uint16, value uint8) {
 
 func (cpu *CPU) readTileData(address uint16) [8][8]uint8 {
 	var tile [8][8]uint8
+
+	if address < VRAM_START || address > 0x97FF {
+		fmt.Printf("read tile data -> invalid address 0x%04X", address)
+		return tile
+	}
 	for row := 0; row < 8; row++ {
 		low := cpu.memoryRead(address + uint16(row*2))
 		high := cpu.memoryRead(address + uint16(row*2) + 1)
@@ -454,7 +459,7 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 		fmt.Printf("Sprite %d -> OAM Addr: 0x%04X | X: %d Y: %d | Tile Index: %d | Attributes: 0b%08b\n", i, spriteAddr, x, y, tileIndex, attributes)
 
 		//check if sprite is onscanline
-		if int(graphic.LY) < y || int(graphic.LY) > y+spriteSize {
+		if int(graphic.LY) < y || int(graphic.LY) >= y+spriteSize {
 			continue
 		}
 
@@ -486,6 +491,10 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 
 			//tileData := graphic.tileSet[sprite.tileIndex]
 			tileAddress := 0x8000 + (int(sprite.tileIndex) * 16)
+			if tileAddress < VRAM_START || tileAddress > 0x97FF {
+				fmt.Printf("tileAddress %04X is invalid\n", tileAddress)
+				continue
+			}
 			//tileData := graphic.cpu.readTileData(uint16(sprite.tileIndex))
 			tileData := graphic.cpu.readTileData(uint16(tileAddress))
 			fmt.Printf("Tile data: %d\n", tileData)
@@ -494,39 +503,55 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 
 			//DMGPallete := attributes & (1 << 4)
 
-			tileY := graphic.LY - uint8(sprite.y)
+			tileY := int(graphic.LY) - sprite.y
 			if yFlip != 0 {
-				tileY = uint8(spriteSize) - 1 - graphic.LY - uint8(sprite.y)
+				//tileY = uint8(spriteSize) - 1 - graphic.LY - uint8(sprite.y)
+				tileY = spriteSize - 1 - tileY
 				//tileY = uint8(spriteSize) - 1 - uint8(sprite.y)
 
 			}
-
+			if tileY < 0 || tileY >= 8 {
+				fmt.Printf("tileY %d is out of bounds (LY=%d, spriteY=%dm spriteSize=%d) \n", tileY, graphic.LY, sprite.y, spriteSize)
+				continue
+			}
 			for col := 0; col < 8; col++ {
 				tileX := col
 				if xFlip != 0 {
 					tileX = 7 - col
 				}
+				fmt.Printf("tiledata: %d, tileX: %d, tileY: %d\n", tileData, tileX, tileY)
+				if tileX < 0 || tileX >= 8 || tileY < 0 || tileY >= 8 {
+					fmt.Printf("Out of bounds! tileX=%d, tileY=%d  (oamOrder=%d, tileIdx=%d, sprtieX=%d, spriteY=%d)\n", tileX, tileY, sprite.OAMOrder, sprite.tileIndex, sprite.x, sprite.y)
+				}
+				fmt.Printf("About to fetch pixel for sprite: tileX=%d, tileY=%d, tileIndex=%d\n", tileX, tileY, sprite.tileIndex)
 				pixelValue := tileData[tileY][tileX]
 				fmt.Printf("Pixel value: %02X\n", pixelValue)
 				if pixelValue == 0 {
+					fmt.Printf("skip transparent")
 					continue // transparent
 				}
 				screenX := sprite.x + col
-				screenY := uint8(sprite.y) + graphic.LY
+				//screenY := uint8(sprite.y) + graphic.LY
+				screenY := graphic.LY
 
 				// check bounds
 				if screenX < 0 || screenY < 0 || screenX >= width || screenY >= height {
+					fmt.Printf("skip pixel out of bounds (x:%d, y:%d)\n", screenX, screenY)
 					continue
 				}
 
 				//TODO: priority
 				bgPixelValue := bgPixels[screenY][screenX]
 				if priority != 0 && bgPixelValue != 0 {
+					fmt.Printf("skip pixel -> priority bgPixelValue: %02X\n", bgPixelValue)
 					continue
 				}
 
 				if spritePixels[screenX] == 255 {
+					fmt.Printf("Drawing sprite pixel at ScreenX=%d ScreenY=%d, value=%d\n", screenX, screenY, pixelValue)
 					spritePixels[screenX] = pixelValue
+				} else {
+					fmt.Println("Skip pixel. Pixel already occupied")
 				}
 				//rl.DrawPixel(int32(screenX), int32(screenY), colors[pixelValue])
 
@@ -605,6 +630,10 @@ func (graphic *Graphics) getWindow() [height][width]uint8 {
 				winMapAddr = uint16(0x9C00)
 			}
 			tileIdxAddr := winMapAddr + uint16((winY/8)*32+(winX/8))
+
+			if tileIdxAddr < VRAM_START || tileIdxAddr > VRAM_END {
+				continue
+			}
 			//tileIndex := graphic.VRAM[tileIdxAddr]
 			tileIndex := graphic.readVRAM(tileIdxAddr)
 
@@ -627,7 +656,7 @@ func (graphic *Graphics) getWindow() [height][width]uint8 {
 }
 
 func (graphic *Graphics) renderScanline() {
-
+	fmt.Println("In render scanline")
 	if int(graphic.LY) >= height {
 		return
 	}
@@ -636,15 +665,22 @@ func (graphic *Graphics) renderScanline() {
 	winPixels := graphic.getWindow()
 	spritePixels := graphic.spritesOAM()
 
+	//fmt.Printf("bgPixels: %d, winPixels: %d, spritePixels: %d\n", bgPixels, winPixels, spritePixels)
+	fmt.Printf("LCDC: 0b%08b and sprite flag %t\n", graphic.LCDC, (graphic.LCDC&(1<<1)) != 0)
 	for screenX := 0; screenX < width; screenX++ {
+		fmt.Printf("bgPixels: %d, winPixels: %d, spritePixels: %d at LY:%d and screenX:%d\n", bgPixels[graphic.LY][screenX], winPixels[graphic.LY][screenX], spritePixels[screenX], graphic.LY, screenX)
+
 		pixel := bgPixels[graphic.LY][screenX]
 		if graphic.LCDC&(1<<5) != 0 && winPixels[graphic.LY][screenX] != 0 {
 			pixel = winPixels[graphic.LY][screenX]
 
 		}
 		if graphic.LCDC&(1<<1) != 0 && spritePixels[screenX] != 255 {
+			fmt.Printf("Sprite pixel override at X: %d, value:%d\n", screenX, spritePixels[screenX])
 			pixel = spritePixels[screenX]
 		}
+		fmt.Printf("pixel: %d, color of pixel: %d\n", pixel, colors[pixel])
+
 		rl.DrawPixel(int32(screenX), int32(graphic.LY), colors[pixel])
 	}
 }
@@ -732,7 +768,7 @@ func (graphic *Graphics) renderScanline() {
 //func (graphic *Graphics) modesHandeling(tCycles int) {
 //	//fmt.Println("In modesHandeling with graphics at ", graphic)
 //	//fmt.Println("graphics.cpu", graphic.cpu)
-//	fmt.Println("mode handleing")
+//	fmt.Println("mode handling")
 //	if graphic.cpu == nil {
 //		fmt.Println("Error: graphics.cpu is nil")
 //		return
@@ -838,7 +874,7 @@ func (graphic *Graphics) renderScanline() {
 //}
 
 func (graphic *Graphics) modesHandeling(tCycles int) {
-	fmt.Println("mode handleing")
+	fmt.Println("mode handling")
 	if graphic.cpu == nil {
 		fmt.Println("Error: graphics.cpu is nil")
 		return

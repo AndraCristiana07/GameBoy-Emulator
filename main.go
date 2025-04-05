@@ -18,7 +18,6 @@ func main() {
 	cartridge.printInfo()
 	//cpu := CPU{}
 	cpu := NewCPU()
-	
 
 	cpu.loadROMFile(cartridge, cpu.graphics)
 
@@ -34,7 +33,7 @@ func main() {
 
 		rl.ClearBackground(rl.Black)
 
-		fmt.Println("Startinf new frame")
+		fmt.Println("Starting new frame")
 		cyclesCurrFrame := 0
 
 		//for addr := OAM_START; addr < OAM_END; addr++ {
@@ -49,7 +48,7 @@ func main() {
 			cyclesCurrFrame += tCycles
 
 			fmt.Printf("tCycles: %d, total: %d, graphics.cycles: %d\n", tCycles, cyclesCurrFrame, cpu.graphics.cycle)
-			fmt.Printf("MEmory[0x0039]: 0x%02X\n", cpu.Memory[0x0039])
+			//fmt.Printf("Memory[0x0039]: 0x%02X\n", cpu.Memory[0x0039])
 
 			cpu.graphics.modesHandeling(tCycles)
 			fmt.Println("after modes handle = LY: ", cpu.graphics.LY, " mode: ", cpu.graphics.mode, " cycles total now: ", cpu.graphics.cycle)
