@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	rl "github.com/gen2brain/raylib-go/raylib"
 	"sort"
+
+	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 const width = 160
@@ -58,29 +59,6 @@ type Sprite struct {
 }
 type Graphics struct {
 	cpu *CPU
-	//VRAM    [VRAM_SIZE]byte
-	//OAM     [OAM_SIZE]byte // Object Attribute Memory
-	LCDC    byte // LCD control
-	tileSet [384]tile
-
-	LY   uint8 // FF44, value from 0-153
-	LYC  uint8 // FF45
-	STAT uint8 //FF41
-
-	//SCY, SCX: Background viewport Y position, X position
-	SCY uint8 // FF42
-	SCX uint8 // FF43
-
-	//Window Y position, X position plus 7
-	WY uint8 // FF4A
-	WX uint8 // FF4B
-
-	BGP uint8 //FF47
-
-	OBP0 uint8 //FF48
-	OBP1 uint8 // FF49\
-
-	mode int
 
 	cycle int
 }
@@ -91,6 +69,7 @@ type Graphics struct {
 // DMG palette [Non CGB Mode only]: 0 = OBP0, 1 = OBP1
 // Bank [CGB Mode Only]: 0 = Fetch tile from VRAM bank 0, 1 = Fetch tile from VRAM bank 1
 // CGB palette [CGB Mode Only]: Which of OBP0–7 to use
+
 //type Attributes struct {
 //	priority   bool
 //	yFlip      bool
@@ -98,280 +77,56 @@ type Graphics struct {
 //	DMGPalette bool
 //}
 
-func NewGraphics() *Graphics {
-	graphic := &Graphics{}
-	fmt.Println("New graphics called. address", &graphic)
+func NewGraphics(cpu *CPU) *Graphics {
+	graphic := &Graphics{cpu: cpu}
+	// fmt.Println("New graphics called. address", &graphic)
 	graphic.cycle = 0
-	graphic.LY = 0 //first scanline
-	graphic.LYC = 0
-	graphic.mode = MODE_OAMSCAN //?
-
-	//LYCSelect, mode2, mode1, mode0, LYCeqLY, _ := graphic.lcdStatusBits()
-	//LYCSelect |= 0
-	//mode2 |= 0
-	//mode1 |= 0
-	//mode0 |= 0
-	//LYCeqLY |= 0
-	graphic.STAT = 0b00000001 //?
-	graphic.LCDC = 0x91       //?
-	graphic.LCDC |= 1 << 1
-	graphic.WX = 0
-	graphic.WY = 0
-	graphic.SCX = 0
-	graphic.SCY = 0
-
-	graphic.OBP1 = 1
-	graphic.OBP0 = 0
-
-	//for i := 0; i < VRAM_SIZE; i++ {
-	//	graphic.VRAM[i] = 0
-	//}
-	//for i := 0; i < OAM_SIZE; i++ {
-	//	graphic.OAM[i] = 0
-	//}
 	return graphic
+}
+
+func (graphic *Graphics) getLCDC() uint8 {
+	return graphic.cpu.Memory[0xFF40]
+}
+
+func (graphic *Graphics) getLY() uint8 {
+	return graphic.cpu.Memory[0xFF44]
+}
+
+func (graphic *Graphics) getSTAT() uint8 {
+	return graphic.cpu.Memory[0xFF41]
+}
+
+func (graphic *Graphics) getSCY() uint8 {
+	return graphic.cpu.Memory[0xFF42]
+}
+func (graphic *Graphics) getSCX() uint8 {
+	return graphic.cpu.Memory[0xFF43]
+}
+
+func (graphic *Graphics) getWY() uint8 {
+	return graphic.cpu.Memory[0xFF4A]
+}
+
+func (graphic *Graphics) getWX() uint8 {
+	return graphic.cpu.Memory[0xFF4B]
 }
 
 func (graphic *Graphics) readVRAM(address uint16) byte {
 	if address >= VRAM_START && address <= VRAM_END {
 		return graphic.cpu.Memory[address-VRAM_START]
 	}
-	return 0
-}
-
-func (graphic *Graphics) writeVRAM(address uint16, value byte) {
-	index := address - VRAM_START
-	graphic.cpu.Memory[index] = value
-	if index >= 0x1800 {
-		return
-	}
-	// tiles rows encoded in 2 bytes
-	// first byte on even address
-	normalizedIndex := index & 0xFFFE
-
-	// get bytes for tile row
-	byte1 := graphic.cpu.Memory[normalizedIndex]
-	byte2 := graphic.cpu.Memory[normalizedIndex+1]
-
-	//byte1 := graphic.readVRAM(normalizedIndex)
-	//byte2 := graphic.readVRAM(normalizedIndex + 1)
-
-	tileIndex := index / 16      // each tile 16 bytes,  8 rows tall, 2 bytes => 16 bytes
-	rowIndex := (index % 16) / 2 // 2 bytes per row
-
-	for pixel := 0; pixel < 8; pixel++ {
-		//pixel 0 - left most bit (bit 7)
-		mask := 1 << (7 - pixel)
-		lsb := byte1 & byte(mask) // first byte -> least significant bit
-		msb := byte2 & byte(mask) // second byte -> most significant bit
-		//var value byte
-		var pixelValue TilePixelID
-		if lsb != 0 && msb != 0 {
-			//var tilepixelid = three
-			pixelValue = three
-		} else if lsb != 0 {
-			pixelValue = one
-		} else if msb != 0 {
-			pixelValue = two
-		} else {
-			pixelValue = zero
-		}
-		graphic.tileSet[tileIndex][rowIndex][pixel] = uint8(pixelValue)
-	}
-
-}
-
-func (graphic *Graphics) dmaTransfer(value uint8) {
-	upper := uint16(value) << 8
-	for i := 0; i < OAM_SIZE; i++ {
-		graphic.cpu.Memory[i] = graphic.cpu.Memory[upper+uint16(i)]
-		fmt.Printf("DMA Transfer ->  %04X - %02X\n ", i, graphic.cpu.Memory[i])
-	}
-}
-
-func (graphic *Graphics) readOAM(address uint16) byte {
-	//if address >= OAM_START && address <= OAM_END {
-	return graphic.cpu.Memory[address]
-	//}
+	panic("nu ar trebui sa se intample asa ceva")
 	//return 0
 }
 
-func (graphic *Graphics) writeOAM(address uint16, value byte) {
-	//if address >= 0xFE00 && address <= 0xFE9F {
-	graphic.cpu.Memory[address] = value
-
-	//graphic.OAM[address&0x009F] = value
-	//}
-}
-
-func (graphic *Graphics) getFromMemory(address uint16) uint8 {
-	switch {
-	//case address >= VRAM_START && address <= VRAM_END:
-	//	return graphic.readVRAM(address)
-	//case address >= OAM_START && address <= OAM_END:
-	//	return graphic.readOAM(address)
-	case address == 0xFF44:
-		return graphic.LY
-	case address == 0xFF45:
-		return graphic.LYC
-	case address == 0xFF40:
-		// TODO: get for LCDC
-		graphic.getLCDC()
-	case address == 0xFF41:
-		//TODO: dct for STAT
-		graphic.getSTAT()
-	case address == 0xFF42:
-		return graphic.SCY
-	case address == 0xFF43:
-		return graphic.SCX
-	case address == 0xFF4A:
-		return graphic.WY
-	case address == 0xFF4B:
-		return graphic.WX
-	case address == 0xFF47:
-		return graphic.BGP
-	case address == 0xFF48:
-		return graphic.OBP0
-	case address == 0xFF49:
-		return graphic.OBP1
-
-	default:
-		fmt.Printf("GPU read unknown address")
-	}
-	return 0
-
-}
-
-func (graphic *Graphics) getSTAT() uint8 {
-	var bit1, bit2, bit3, bit4, bit5 uint8
-	LYCSelect, mode2, mode1, mode0, LYCeqLY, _ := graphic.lcdStatusBits()
-	if LYCSelect != 0 {
-		bit1 = 0b01000000
-	} else {
-		bit1 = 0
-	}
-	if mode2 != 0 {
-		bit2 = 0b00100000
-	} else {
-		bit2 = 0
-	}
-	if mode1 != 0 {
-		bit3 = 0b00010000
-	} else {
-		bit3 = 0
-	}
-	if mode0 != 0 {
-		bit4 = 0b00001000
-	} else {
-		bit4 = 0
-	}
-	if LYCeqLY != 0 {
-		bit5 = 0b00000100
-	} else {
-		bit5 = 0
-	}
-	return bit1 | bit2 | bit3 | bit4 | bit5 | uint8(graphic.mode)
-}
-
-func (graphic *Graphics) setSTAT(value uint8) {
-
-	LYCSelect, mode2, mode1, mode0, LYCeqLY, _ := graphic.lcdStatusBits()
-	LYCSelect |= value & 0b01000000
-	mode2 |= value & 0b00100000
-	mode1 |= value & 0b00010000
-	mode0 |= value & 0b00001000
-	LYCeqLY |= value & 0b00000100
-}
-
-func (graphic *Graphics) getLCDC() uint8 {
-	LCDEnable, windowTileMapArea, windowEnable, bgWinTileDataArea, bgTileDataArea, objSize, objEnable, bgWinEnable := graphic.lcdControlBits()
-	var bit1, bit2, bit3, bit4, bit5, bit6, bit7, bit8 uint8
-	if LCDEnable != 0 {
-		bit1 = 0b10000000
-
-	} else {
-		bit1 = 0
-	}
-	if windowTileMapArea != 0 {
-		bit2 = 0b01000000
-	} else {
-		bit2 = 0
-	}
-	if windowEnable != 0 {
-		bit3 = 0b00100000
-	} else {
-		bit3 = 0
-	}
-	if bgWinTileDataArea != 0 {
-		bit4 = 0b00010000
-	} else {
-		bit4 = 0
-	}
-	if bgTileDataArea != 0 {
-		bit5 = 0b00001000
-	} else {
-		bit5 = 0
-	}
-	if objSize != 0 {
-		bit6 = 0b00000100
-	} else {
-		bit6 = 0
-	}
-	if objEnable != 0 {
-		bit7 = 0b00000010
-	} else {
-		bit7 = 0
-	}
-	if bgWinEnable != 0 {
-		bit8 = 0b00000001
-	} else {
-		bit8 = 0
-	}
-	return bit1 | bit2 | bit3 | bit4 | bit5 | bit6 | bit7 | bit8
-}
-
-func (graphic *Graphics) setLCDC(value uint8) {
-	LCDEnable, windowTileMapArea, windowEnable, bgWinTileDataArea, bgTileDataArea, objSize, objEnable, bgWinEnable := graphic.lcdControlBits()
-	LCDEnable |= value & 0b10000000
-	windowTileMapArea |= value & 0b01000000
-	windowEnable |= value & 0b00100000
-	bgWinTileDataArea |= value & 0b00010000
-	bgTileDataArea |= value & 0b00001000
-	objSize |= value & 0b00000100
-	objEnable |= value & 0b00000010
-	bgWinEnable |= value & 0b00000001
-
-}
-
-func (graphic *Graphics) set(address uint16, value uint8) {
-	switch {
-	//case address >= VRAM_START && address <= VRAM_END:
-	//	graphic.writeVRAM(address, value)
-	//case address >= OAM_START && address <= OAM_END:
-	//	graphic.writeOAM(address, value)
-	case address == 0xFF44:
-		graphic.LY = value
-	case address == 0xFF45:
-		graphic.LYC = value
-	case address == 0xFF40:
-		graphic.setLCDC(value)
-	case address == 0xFF41:
-		graphic.setSTAT(value)
-	case address == 0xFF42:
-		graphic.SCY = value
-	case address == 0xFF43:
-		graphic.SCX = value
-	case address == 0xFF4A:
-		graphic.WY = value
-	case address == 0xFF4B:
-		graphic.WX = value
-	case address == 0xFF47:
-		graphic.BGP = value
-	case address == 0xFF48:
-		graphic.OBP0 = value
-	case address == 0xFF49:
-		graphic.OBP1 = value
-
+func (graphic *Graphics) dmaTransfer(value uint8) {
+	println("dmaTransfer")
+	//upper := uint16(value) / 100
+	upper := uint16(value) << 8
+	//dest := uint16(OAM_START)
+	for i := 0; i < OAM_SIZE; i++ {
+		graphic.cpu.Memory[OAM_START+i] = graphic.cpu.Memory[upper+uint16(i)]
+		// fmt.Printf("DMA Transfer ->  %04X - %02X\n ", i, graphic.cpu.Memory[i])
 	}
 
 }
@@ -380,7 +135,7 @@ func (cpu *CPU) readTileData(address uint16) [8][8]uint8 {
 	var tile [8][8]uint8
 
 	if address < VRAM_START || address > 0x97FF {
-		fmt.Printf("read tile data -> invalid address 0x%04X", address)
+		// fmt.Printf("read tile data -> invalid address 0x%04X\n", address)
 		return tile
 	}
 	for row := 0; row < 8; row++ {
@@ -389,49 +144,63 @@ func (cpu *CPU) readTileData(address uint16) [8][8]uint8 {
 
 		for col := 0; col < 8; col++ {
 			bit := 7 - col
-			color := ((high>>bit)&1)<<1 | ((low >> bit) & 1)
-			tile[row][col] = uint8(color)
+			msbLow := (low >> bit) & 1
+			msbHigh := (high >> bit) & 1
+			colorID := (msbHigh << 1) | msbLow
+			tile[row][col] = uint8(colorID)
 		}
 	}
 	return tile
 }
 
+func (graphic *Graphics) getTilePixel(address uint16, x int, y int) uint8 {
+	//each tile taking 16 bytes, 2 per row
+	// y row idx
+	// x pixel idx
+	rowAddr := address + uint16(y*2)
+	bit := 7 - x
+	low := graphic.cpu.memoryRead(uint16(rowAddr))
+	high := graphic.cpu.memoryRead(uint16(rowAddr) + 1)
+	//msbLow := low & (1 << bit)
+	//msbHigh := high & (1 << bit)
+	msbLow := (low >> bit) & 1
+	msbHigh := (high >> bit) & 1
+	colorID := (msbHigh << 1) | msbLow
+	return colorID
+
+}
+
 // sprites tiles
 // OAM scan - mode 2
-func (graphic *Graphics) spritesOAM() [width]uint8 {
+func (graphic *Graphics) spritesOAM() [height][width]uint8 {
 
-	var spritePixels [width]uint8
+	// fmt.Println("In sprites render")
+	var spritePixels [height][width]uint8
 
-	for i := range spritePixels {
-		spritePixels[i] = 255 //default transparent
+	for y := range spritePixels {
+		for x := range spritePixels[y] {
+			spritePixels[y][x] = 255
+		}
 	}
-
-	//// sprite disable
-	//if graphic.LCDC&(1<<1) == 0 {
-	//	return nil
-	//}
+	//obp0 := graphic.cpu.Memory[0xFF48]
+	//obp1 := graphic.cpu.Memory[0xFF49]
 	spriteSize := 8
 
 	//In 8x16 sprite mode, the least significant bit of the
 	// sprite pattern number is ignored and treated as 0.
 
-	if graphic.LCDC&(1<<2) != 0 {
+	if graphic.getLCDC()&(1<<2) != 0 {
 		spriteSize = 16
 	}
 
 	// 10 sprites visible at a time
 	var visibleSprites []Sprite
 
-	//test sprite
-	//for i := 0; i < 12; i++ {
-	//	fmt.Printf("sprite %d: y: %d  x: %d  attrib: %d\n", i, graphic.OAM[i*4], graphic.OAM[i*4+1], graphic.OAM[i*4+2])
-	//}
-
 	// display up to 40 movable objects (or sprites)
 	for i := 0; i < 40; i++ {
 		// each sprite consists of 4 bytes
 		spriteAddr := OAM_START + i*4
-		fmt.Println("spriteAddr is", spriteAddr)
+		// fmt.Printf("spriteAddr is 0x%04X\n", spriteAddr)
 
 		//Byte 0 — Y Position
 		//Y = Object’s vertical position on the screen + 16
@@ -443,123 +212,125 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 		x := int(graphic.cpu.memoryRead(uint16(spriteAddr+1))) - 8
 
 		//Byte 2 — Tile Index
-		//tileIndex := graphic.OAM[OAM_START + spriteAddr+2]
+		//// fmt.Printf("Value at address 0x%04X is %d\n", spriteAddr+2, graphic.cpu.memoryRead(uint16(spriteAddr+2)))
+
 		tileIndex := graphic.cpu.memoryRead(uint16(spriteAddr + 2))
-		//fmt.Printf("Tile index: %d\n", tileIndex)
 
 		if spriteSize == 16 {
-			tileIndex &= 0xFF // mask bit 0
+			tileIndex &= 0xFE // mask bit 0
 		}
-		//if tileIndex >= 384 {
-		//	continue
-		//}
+
 		//Byte 3 — Attributes/Flags
 		//attributes := graphic.OAM[spriteAddr+3]
 		attributes := graphic.cpu.memoryRead(uint16(spriteAddr + 3))
-		fmt.Printf("Sprite %d -> OAM Addr: 0x%04X | X: %d Y: %d | Tile Index: %d | Attributes: 0b%08b\n", i, spriteAddr, x, y, tileIndex, attributes)
+		//// fmt.Printf("value for spriteaddr: %d\n", graphic.cpu.memoryRead(uint16(spriteAddr)))
+		//// fmt.Printf("Sprite %d -> OAM Addr: 0x%04X | X: %d Y: %d | Tile Index: %d | Attributes: 0b%08b\n", i, spriteAddr, x, y, tileIndex, attributes)
 
 		//check if sprite is onscanline
-		if int(graphic.LY) < y || int(graphic.LY) >= y+spriteSize {
+		if int(graphic.getLY()) < y || int(graphic.getLY()) >= y+spriteSize {
 			continue
 		}
 
 		visibleSprites = append(visibleSprites, Sprite{x, y, tileIndex, attributes, i})
+	}
 
-		// TODO: sort sprites by priority
-		// order by X (smaller X->bigger prority)
-		//if x the same => by OAM location order
-		sort.Slice(visibleSprites, func(i, j int) bool {
-			if visibleSprites[i].x == visibleSprites[j].x {
-				return visibleSprites[i].OAMOrder < visibleSprites[j].OAMOrder
-			}
-			return visibleSprites[i].x < visibleSprites[j].x
-		})
-
-		// render 10 sprites
-		if len(visibleSprites) > 10 {
-			visibleSprites = visibleSprites[:10]
+	// order by X (smaller X->bigger prority)
+	//if x the same => by OAM location order
+	sort.Slice(visibleSprites, func(i, j int) bool {
+		if visibleSprites[i].x == visibleSprites[j].x {
+			return visibleSprites[i].OAMOrder < visibleSprites[j].OAMOrder
 		}
+		return visibleSprites[i].x < visibleSprites[j].x
+	})
 
-		bgPixels := graphic.getBackground()
+	// render 10 sprites
+	if len(visibleSprites) > 10 {
+		visibleSprites = visibleSprites[:10]
+	}
 
-		for _, sprite := range visibleSprites {
+	bgPixels := graphic.getBackground()
 
-			//					7			6	  5			 4		     3		 2	1	0
-			//Attributes	Priority	Y flip	X flip	 DMG palette 	Bank	CGB palette
-			yFlip := sprite.attributes & (1 << 6)
-			xFlip := sprite.attributes & (1 << 5)
+	for _, sprite := range visibleSprites {
 
-			//tileData := graphic.tileSet[sprite.tileIndex]
-			tileAddress := 0x8000 + (int(sprite.tileIndex) * 16)
-			if tileAddress < VRAM_START || tileAddress > 0x97FF {
-				fmt.Printf("tileAddress %04X is invalid\n", tileAddress)
+		//					7			6	  5			 4		     3		 2	1	0
+		//Attributes	Priority	Y flip	X flip	 DMG palette 	Bank	CGB palette
+		yFlip := sprite.attributes & (1 << 6)
+		xFlip := sprite.attributes & (1 << 5)
+
+		priority := sprite.attributes & (1 << 7)
+
+		//DMGPallete := sprite.attributes & (1 << 4)
+
+		//palette := obp0
+		//if DMGPallete != 0 {
+		//	palette = obp1
+		//}
+
+		tileY := int(graphic.getLY()) - sprite.y
+		if yFlip != 0 {
+			tileY = spriteSize - 1 - tileY
+
+		}
+		if tileY < 0 || tileY >= 8 {
+			//// fmt.Printf("tileY %d is out of bounds (LY=%d, spriteY=%dm spriteSize=%d) \n", tileY, graphic.getLY(), sprite.y, spriteSize)
+			continue
+		}
+		tileAddress := 0x8000 + (int(sprite.tileIndex) * 16)
+		if tileAddress < VRAM_START || tileAddress > 0x97FF {
+			// fmt.Printf("tileAddress %04X is invalid\n", tileAddress)
+			continue
+		}
+		tileData := graphic.cpu.readTileData(uint16(tileAddress))
+		// fmt.Printf("Tile data: %d\n", tileData)
+
+		for col := 0; col < 8; col++ {
+			tileX := col
+			if xFlip != 0 {
+				tileX = 7 - col
+			}
+			// fmt.Printf("tiledata: %d, tileX: %d, tileY: %d\n", tileData, tileX, tileY)
+			if tileX < 0 || tileX >= 8 || tileY < 0 || tileY >= 8 {
+				// fmt.Printf("Out of bounds! tileX=%d, tileY=%d  (oamOrder=%d, tileIdx=%d, sprtieX=%d, spriteY=%d)\n", tileX, tileY, sprite.OAMOrder, sprite.tileIndex, sprite.x, sprite.y)
+			}
+			// fmt.Printf("About to fetch pixel for sprite: tileX=%d, tileY=%d, tileIndex=%d\n", tileX, tileY, sprite.tileIndex)
+			pixelValue := tileData[tileY][tileX]
+
+			// fmt.Printf("Pixel value: %02X\n", pixelValue)
+			if pixelValue == 0 {
+				// fmt.Printf("skip transparent")
+				continue // transparent
+			}
+			screenX := sprite.x + col
+			screenY := graphic.getLY()
+
+			// check bounds
+			if screenX < 0 || screenY < 0 || screenX >= width || screenY >= height {
+				// fmt.Printf("skip pixel out of bounds (x:%d, y:%d)\n", screenX, screenY)
 				continue
 			}
-			//tileData := graphic.cpu.readTileData(uint16(sprite.tileIndex))
-			tileData := graphic.cpu.readTileData(uint16(tileAddress))
-			fmt.Printf("Tile data: %d\n", tileData)
 
-			priority := attributes & (1 << 7)
-
-			//DMGPallete := attributes & (1 << 4)
-
-			tileY := int(graphic.LY) - sprite.y
-			if yFlip != 0 {
-				//tileY = uint8(spriteSize) - 1 - graphic.LY - uint8(sprite.y)
-				tileY = spriteSize - 1 - tileY
-				//tileY = uint8(spriteSize) - 1 - uint8(sprite.y)
-
-			}
-			if tileY < 0 || tileY >= 8 {
-				fmt.Printf("tileY %d is out of bounds (LY=%d, spriteY=%dm spriteSize=%d) \n", tileY, graphic.LY, sprite.y, spriteSize)
+			bgPixelValue := bgPixels[screenY][screenX]
+			if priority != 0 && bgPixelValue != 0 {
+				// fmt.Printf("skip pixel -> priority bgPixelValue: %02X\n", bgPixelValue)
 				continue
 			}
-			for col := 0; col < 8; col++ {
-				tileX := col
-				if xFlip != 0 {
-					tileX = 7 - col
-				}
-				fmt.Printf("tiledata: %d, tileX: %d, tileY: %d\n", tileData, tileX, tileY)
-				if tileX < 0 || tileX >= 8 || tileY < 0 || tileY >= 8 {
-					fmt.Printf("Out of bounds! tileX=%d, tileY=%d  (oamOrder=%d, tileIdx=%d, sprtieX=%d, spriteY=%d)\n", tileX, tileY, sprite.OAMOrder, sprite.tileIndex, sprite.x, sprite.y)
-				}
-				fmt.Printf("About to fetch pixel for sprite: tileX=%d, tileY=%d, tileIndex=%d\n", tileX, tileY, sprite.tileIndex)
-				pixelValue := tileData[tileY][tileX]
-				fmt.Printf("Pixel value: %02X\n", pixelValue)
-				if pixelValue == 0 {
-					fmt.Printf("skip transparent")
-					continue // transparent
-				}
-				screenX := sprite.x + col
-				//screenY := uint8(sprite.y) + graphic.LY
-				screenY := graphic.LY
 
-				// check bounds
-				if screenX < 0 || screenY < 0 || screenX >= width || screenY >= height {
-					fmt.Printf("skip pixel out of bounds (x:%d, y:%d)\n", screenX, screenY)
-					continue
-				}
+			if spritePixels[graphic.getLY()][screenX] == 255 {
+				// fmt.Printf("Drawing sprite pixel at ScreenX=%d ScreenY=%d, value=%d\n", screenX, screenY, pixelValue)
+				//shade := (palette >> (pixelValue * 2)) & 0x03
+				//// fmt.Println("Sprite Palette", palette, "shade", shade)
 
-				//TODO: priority
-				bgPixelValue := bgPixels[screenY][screenX]
-				if priority != 0 && bgPixelValue != 0 {
-					fmt.Printf("skip pixel -> priority bgPixelValue: %02X\n", bgPixelValue)
-					continue
-				}
+				//spritePixels[graphic.getLY()][screenX] = shade
+				spritePixels[graphic.getLY()][screenX] = pixelValue
 
-				if spritePixels[screenX] == 255 {
-					fmt.Printf("Drawing sprite pixel at ScreenX=%d ScreenY=%d, value=%d\n", screenX, screenY, pixelValue)
-					spritePixels[screenX] = pixelValue
-				} else {
-					fmt.Println("Skip pixel. Pixel already occupied")
-				}
-				//rl.DrawPixel(int32(screenX), int32(screenY), colors[pixelValue])
-
+			} else {
+				// fmt.Println("Skip pixel. Pixel already occupied")
 			}
 
 		}
 
 	}
+
 	return spritePixels
 }
 
@@ -567,13 +338,18 @@ func (graphic *Graphics) spritesOAM() [width]uint8 {
 func (graphic *Graphics) getBackground() [height][width]uint8 {
 	// $9800-$9BFF and $9C00-$9FFF
 	var bgPixels [height][width]uint8
-	for screenY := 0; screenY < height; screenY++ {
-		for screenX := 0; screenX < width; screenX++ {
-			bgY := (screenY + int(graphic.LY) + int(graphic.SCY)) & 0xFF
+	//palette := graphic.cpu.Memory[0xFF47]
 
-			bgX := (screenX + int(graphic.SCX)) & 0x1F
+	for screenY := 0; screenY < height; screenY++ {
+		//bgY := (screenY + int(graphic.getLY()) + int(graphic.getSCY())) & 0xFF
+		bgY := (screenY + int(graphic.getSCY())) & 0xFF
+		for screenX := 0; screenX < width; screenX++ {
+
+			//bgX := (screenX + int(graphic.getSCX())) & 0x1F
+			bgX := (screenX + int(graphic.getSCX())) & 0xFF
+
 			bgMapAddr := uint16(0x9800) //default
-			if graphic.LCDC&(1<<3) != 0 {
+			if graphic.getLCDC()&(1<<3) != 0 {
 				bgMapAddr = uint16(0x9C00)
 			}
 			tileIdxAddr := bgMapAddr + uint16((bgY/8)*32+(bgX/8))
@@ -581,21 +357,40 @@ func (graphic *Graphics) getBackground() [height][width]uint8 {
 			if tileIdxAddr < VRAM_START || tileIdxAddr > VRAM_END {
 				continue
 			}
-			//tileIndex := graphic.VRAM[tileIdxAddr]
 			tileIndex := graphic.readVRAM(tileIdxAddr)
 			var tileNumber int
 			//$8000-$97FFbgY
-			if graphic.LCDC&(1<<4) != 0 {
+			if graphic.getLCDC()&(1<<4) != 0 {
 				tileNumber = int(tileIndex)
 			} else {
 				tileNumber = int(int8(tileIndex)) // make it signed from unsigned
 			}
 
-			tileData := graphic.tileSet[tileNumber]
+			if tileNumber < 0 || tileNumber >= 384 {
+				// fmt.Printf("Invalid tile index: %d tileIdxAddr: 0x%04X\n", tileNumber, tileIdxAddr)
+				continue
+			}
+
+			//var tileAddr uint16
+			//if graphic.getLCDC()&(1<<4) != 0 {
+			//	tileAddr = 0x8000 + uint16(tileNumber*16)
+			//} else {
+			//	tileAddr = 0x9000 + uint16(tileNumber*16)
+			//}
+			//
+			//// fmt.Println("Tile address background", tileAddr)
 			tileY := bgY % 8
 			tileX := bgX % 8
-			bgPixels[screenY][screenX] = tileData[tileY][tileX]
+			//colorID := graphic.getTilePixel(uint16(tileNumber), tileX, tileY)
+			colorID := graphic.getTilePixel(uint16(tileNumber*16), tileX, tileY)
 
+			//colorID := graphic.getTilePixel(tileAddr, tileX, tileY)
+
+			//BGP Palette
+			//shade := (palette >> (colorID * 2)) & 0x03
+			//// fmt.Println("Background palette:", palette, "shade:", shade)
+			//bgPixels[screenY][screenX] = shade
+			bgPixels[screenY][screenX] = colorID
 		}
 	}
 	return bgPixels
@@ -607,26 +402,24 @@ func (graphic *Graphics) getWindow() [height][width]uint8 {
 	var window [height][width]uint8
 
 	// window display disabled
-	if graphic.LCDC&(1<<5) == 0 {
+	if graphic.getLCDC()&(1<<5) == 0 {
 		return window
 	}
 
 	for screenY := 0; screenY < height; screenY++ {
-		if screenY < int(graphic.WY) {
+		if screenY < int(graphic.getWY()) {
 			continue
 		}
 		for screenX := 0; screenX < width; screenX++ {
-			//if graphic.WX < 7 {
-			//	continue
-			//}
-			if screenX < int(graphic.WX)-7 {
+
+			if screenX < int(graphic.getWX())-7 {
 				continue
 			}
-			winY := screenY - int(graphic.WY)
+			winY := screenY - int(graphic.getWY())
 
-			winX := screenX - (int(graphic.WX) - 7)
+			winX := screenX - (int(graphic.getWX()) - 7)
 			winMapAddr := uint16(0x9800)
-			if graphic.LCDC&(1<<6) != 0 {
+			if graphic.getLCDC()&(1<<6) != 0 {
 				winMapAddr = uint16(0x9C00)
 			}
 			tileIdxAddr := winMapAddr + uint16((winY/8)*32+(winX/8))
@@ -634,21 +427,38 @@ func (graphic *Graphics) getWindow() [height][width]uint8 {
 			if tileIdxAddr < VRAM_START || tileIdxAddr > VRAM_END {
 				continue
 			}
-			//tileIndex := graphic.VRAM[tileIdxAddr]
 			tileIndex := graphic.readVRAM(tileIdxAddr)
 
 			var tileNumber int
 
-			if graphic.LCDC&(1<<4) != 0 {
+			if graphic.getLCDC()&(1<<4) != 0 {
 				tileNumber = int(tileIndex)
 			} else {
 				tileNumber = int(int8(tileIndex))
 			}
 
-			tileData := graphic.tileSet[tileNumber]
+			//var tileAddr uint16
+			//if graphic.getLCDC()&(1<<4) != 0 {
+			//	tileAddr = 0x8000 + uint16(tileNumber*16)
+			//} else {
+			//	tileAddr = 0x9000 + uint16(tileNumber*16)
+			//}
+			//
+			//// fmt.Println("Tile address window", tileAddr)
+
 			tileY := winY % 8
 			tileX := winX % 8
-			window[screenY][screenX] = tileData[tileY][tileX]
+			//colorID := graphic.getTilePixel(tileNumber, tileX, tileY)
+			//colorID := graphic.getTilePixel(uint16(tileNumber), tileX, tileY)
+
+			colorID := graphic.getTilePixel(uint16(tileNumber*16), tileX, tileY)
+			//BGP Palette
+			//palette := graphic.cpu.Memory[0xFF47]
+			//shade := (palette >> (colorID * 2)) & 0x03
+			//// fmt.Println("Window pallete", palette, "shade", shade)
+
+			//window[screenY][screenX] = shade
+			window[screenY][screenX] = colorID
 
 		}
 	}
@@ -656,8 +466,8 @@ func (graphic *Graphics) getWindow() [height][width]uint8 {
 }
 
 func (graphic *Graphics) renderScanline() {
-	fmt.Println("In render scanline")
-	if int(graphic.LY) >= height {
+	// fmt.Println("In render scanline")
+	if int(graphic.getLY()) >= height {
 		return
 	}
 
@@ -665,296 +475,132 @@ func (graphic *Graphics) renderScanline() {
 	winPixels := graphic.getWindow()
 	spritePixels := graphic.spritesOAM()
 
-	//fmt.Printf("bgPixels: %d, winPixels: %d, spritePixels: %d\n", bgPixels, winPixels, spritePixels)
-	fmt.Printf("LCDC: 0b%08b and sprite flag %t\n", graphic.LCDC, (graphic.LCDC&(1<<1)) != 0)
+	//// fmt.Printf("bgPixels: %d, winPixels: %d, spritePixels: %d\n", bgPixels, winPixels, spritePixels)
+	// fmt.Printf("LCDC: 0b%08b and sprite flag %t\n", graphic.getLCDC(), (graphic.getLCDC()&(1<<1)) != 0)
 	for screenX := 0; screenX < width; screenX++ {
-		fmt.Printf("bgPixels: %d, winPixels: %d, spritePixels: %d at LY:%d and screenX:%d\n", bgPixels[graphic.LY][screenX], winPixels[graphic.LY][screenX], spritePixels[screenX], graphic.LY, screenX)
+		// fmt.Printf("bgPixels: %d, winPixels: %d, spritePixels: %d at LY:%d and screenX:%d\n", bgPixels[graphic.getLY()][screenX], winPixels[graphic.getLY()][screenX], spritePixels[graphic.getLY()][screenX], graphic.getLY(), screenX)
+		var pixel uint8 = 0 // default white
 
-		pixel := bgPixels[graphic.LY][screenX]
-		if graphic.LCDC&(1<<5) != 0 && winPixels[graphic.LY][screenX] != 0 {
-			pixel = winPixels[graphic.LY][screenX]
+		// starting with background
+		pixel = bgPixels[graphic.getLY()][screenX]
+
+		// window overrides background
+		if graphic.getLCDC()&(1<<5) != 0 && winPixels[graphic.getLY()][screenX] != 0 {
+			pixel = winPixels[graphic.getLY()][screenX]
 
 		}
-		if graphic.LCDC&(1<<1) != 0 && spritePixels[screenX] != 255 {
-			fmt.Printf("Sprite pixel override at X: %d, value:%d\n", screenX, spritePixels[screenX])
-			pixel = spritePixels[screenX]
-		}
-		fmt.Printf("pixel: %d, color of pixel: %d\n", pixel, colors[pixel])
 
-		rl.DrawPixel(int32(screenX), int32(graphic.LY), colors[pixel])
+		//sprites override, unless transparent
+		//if graphic.getLCDC()&(1<<1) != 0 && spritePixels[graphic.getLY()][screenX] != 255 {
+		//	// fmt.Printf("Sprite pixel override at X: %d, value:%d\n", screenX, spritePixels[screenX])
+		//	pixel = spritePixels[graphic.getLY()][screenX]
+		//}
+		if graphic.getLCDC()&(1<<1) != 0 {
+			spritePixel := spritePixels[graphic.getLY()][screenX]
+			if spritePixel != 255 && spritePixel != 0 {
+				pixel = spritePixel
+				// fmt.Printf("Sprite pixel override at X: %d, value:%d\n", screenX, spritePixels[screenX])
+
+			}
+		}
+		color := colors[pixel]
+		// fmt.Printf("pixel: %d, color of pixel: %d\n", pixel, color)
+
+		//rl.DrawPixel(int32(screenX), int32(graphic.getLY()), color)
+		scale := 4
+		rl.DrawRectangle(int32(screenX*scale), int32(int(graphic.getLY())*scale), int32(scale), int32(scale), color)
+
 	}
 }
 
-//func (graphic *Graphics) modesHandeling(tCycles int) {
-//	cpu := CPU{}
-//	fmt.Println("In modesHandeling")
-//	if graphic.LCDC&(1<<7) == 0 {
-//		return //LCD disabled
-//	}
-//	graphic.cycle += tCycles
-//	LYCSelect, mode2, mode1, mode0, _, _ := graphic.lcdStatusBits()
-//	// at a time total amount of 80 T-Cycles
-//	for graphic.cycle >= 80 {
-//		switch graphic.mode {
-//		case MODE_OAMSCAN:
-//			//mode 2 80 cycles
-//			if graphic.cycle >= 80 {
-//				graphic.mode = MODE_DRAWING
-//				graphic.cycle -= 80
-//
-//			}
-//			if mode2 != 0 {
-//				// handle m2 interrupt
-//				cpu.IF |= 1 << 1
-//
-//			}
-//
-//		case MODE_DRAWING:
-//			//mode 3 172-289 cycles
-//			if graphic.cycle >= 172 {
-//				graphic.mode = MODE_HBLANK
-//				graphic.cycle -= 172
-//				graphic.renderScanline()
-//
-//			}
-//
-//		case MODE_HBLANK:
-//			// mide 0 87-204cycles
-//			if graphic.cycle >= 204 {
-//				graphic.cycle -= 204
-//				graphic.LY++
-//
-//				if graphic.LY == SCANLINES_PER_FRAME {
-//					//enter VBlank
-//					graphic.mode = MODE_VBLANK
-//					// hanfle vblank interrupt
-//					cpu.IF |= 1 << 0
-//				} else {
-//					graphic.mode = MODE_OAMSCAN // start next scanline
-//				}
-//			}
-//			if mode0 != 0 {
-//				// handle m0 interrupt
-//				cpu.IF |= 1 << 1
-//			}
-//
-//		case MODE_VBLANK:
-//			//mode 1 4560 cycles
-//			if graphic.cycle >= CYCLES_PER_LINE {
-//				graphic.LY++
-//				graphic.cycle -= CYCLES_PER_LINE
-//				if graphic.LY > TOTAL_LINES-1 { //end of vblank
-//					graphic.LY = 0
-//					graphic.mode = MODE_OAMSCAN // start new scanline
-//
-//				}
-//			}
-//			if mode1 != 0 {
-//				// handle m1 interrupt
-//				cpu.IF |= 1 << 1
-//			}
-//		}
-//		if graphic.LY == graphic.LYC {
-//			//set stat bit 2
-//			graphic.STAT |= 1 << 2
-//			if LYCSelect != 0 {
-//				cpu.IF |= 1 << 1
-//			}
-//		}
-//	}
-//
-//}
-
-//func (graphic *Graphics) modesHandeling(tCycles int) {
-//	//fmt.Println("In modesHandeling with graphics at ", graphic)
-//	//fmt.Println("graphics.cpu", graphic.cpu)
-//	fmt.Println("mode handling")
-//	if graphic.cpu == nil {
-//		fmt.Println("Error: graphics.cpu is nil")
-//		return
-//	}
-//	if graphic.LCDC&(1<<7) == 0 {
-//		fmt.Println("LCD Disabled!")
-//		return
-//	}
-//	fmt.Println("Before for loop: Entering with tCycles: ", tCycles, " current cycle: ", graphic.cycle, " mode: ", graphic.mode)
-//
-//	graphic.cycle += tCycles
-//	fmt.Println("after adding cycle -> total: ", graphic.cycle, " added cycles: ", tCycles)
-//	fmt.Println("Check reset -> LY: ", graphic.LY, " mode: ", graphic.mode, " cycles total now: ", graphic.cycle)
-//	//LYCSelect, mode2, mode1, mode0, _, _ := graphic.lcdStatusBits()
-//	LYCSelect, mode2, _, mode0, _, _ := graphic.lcdStatusBits()
-//
-//	for graphic.cycle >= 80 {
-//		fmt.Println("Cycle Count:", graphic.cycle, "Mode:", graphic.mode)
-//
-//		switch graphic.mode {
-//		case MODE_OAMSCAN:
-//			if graphic.cycle >= 80 {
-//				//graphic.cycle -= 80
-//				graphic.mode = MODE_DRAWING
-//
-//				fmt.Println("Switching to DRAWING mode")
-//			}
-//			if mode2 != 0 {
-//				graphic.cpu.IF |= 1 << 1
-//				graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
-//			}
-//
-//		case MODE_DRAWING:
-//			//requiredCycles := max(172, graphic.cycle-80)
-//			//if graphic.cycle >= requiredCycles {
-//			fmt.Printf("mode 3 -> LY: %d, cylces: %d", graphic.LY, graphic.cycle)
-//			if graphic.cycle >= 172 {
-//				//graphic.cycle -= 172
-//				graphic.mode = MODE_HBLANK
-//
-//				fmt.Println("Switching to HBLANK mode")
-//				graphic.renderScanline()
-//			}
-//
-//		case MODE_HBLANK:
-//			//if graphic.cycle >= 204 {
-//			if graphic.cycle >= (456 - 80 - 172) {
-//				//graphic.cycle -= 204
-//				//graphic.cycle -= (456 - 80 - 172)
-//				graphic.LY++
-//				graphic.cpu.memoryWrite(0xFF44, graphic.LY)
-//
-//				if graphic.LY == SCANLINES_PER_FRAME {
-//					graphic.mode = MODE_VBLANK
-//					fmt.Println("Entering VBLANK")
-//					graphic.cpu.IF |= 1 << 0
-//					graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
-//
-//				} else {
-//					graphic.mode = MODE_OAMSCAN
-//				}
-//			}
-//			if mode0 != 0 {
-//				graphic.cpu.IF |= 1 << 1
-//				graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
-//
-//			}
-//
-//		case MODE_VBLANK:
-//			if graphic.cycle >= CYCLES_PER_LINE {
-//				graphic.LY++
-//				graphic.cpu.memoryWrite(0xFF44, graphic.LY)
-//
-//				//graphic.cycle -= CYCLES_PER_LINE
-//
-//				if graphic.LY > TOTAL_LINES-1 {
-//					fmt.Println("Exiting VBLANK, starting new frame")
-//					graphic.LY = 0
-//					graphic.cpu.memoryWrite(0xFF44, graphic.LY)
-//
-//					graphic.mode = MODE_OAMSCAN
-//				}
-//			}
-//			//if mode1 != 0 {
-//			//	graphic.cpu.IF |= 1 << 1
-//			//	graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
-//			//
-//			//}
-//		default:
-//			fmt.Println("Unknown mode: ", graphic.mode)
-//		}
-//
-//		if graphic.LY == graphic.LYC {
-//			graphic.STAT |= 1 << 2
-//			graphic.cpu.memoryWrite(0xFF41, graphic.STAT) //update STAT reg
-//			if LYCSelect != 0 {
-//				graphic.cpu.IF |= 1 << 1
-//				graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
-//
-//			}
-//		}
-//	}
-//}
-
 func (graphic *Graphics) modesHandeling(tCycles int) {
-	fmt.Println("mode handling")
+	// fmt.Println("mode handling")
+	// fmt.Printf("LCDC: 0b%08b\n", graphic.getLCDC())
+	//_, _, _, _, _, PPUmode := graphic.lcdStatusBits()
 	if graphic.cpu == nil {
-		fmt.Println("Error: graphics.cpu is nil")
+		// fmt.Println("Error: graphics.cpu is nil")
 		return
 	}
-	if graphic.LCDC&(1<<7) == 0 {
-		fmt.Println("LCD Disabled!")
-		graphic.mode = MODE_HBLANK
+	if graphic.getLCDC()&(1<<7) == 0 {
+		// fmt.Println("LCD Disabled!")
+		graphic.setMode(MODE_HBLANK)
+		//PPUmode = MODE_HBLANK
 		graphic.cycle = 0
 		return
 	}
-	fmt.Println("Before : Entering with tCycles: ", tCycles, " current cycle: ", graphic.cycle, " mode: ", graphic.mode)
+	// fmt.Println("Before : Entering with tCycles: ", tCycles, " current cycle: ", graphic.cycle, " mode: ", PPUmode)
 	graphic.cycle += tCycles
-	//fmt.Println("after adding cycle -> total: ", graphic.cycle, " added cycles: ", tCycles)
+	//// fmt.Println("after adding cycle -> total: ", graphic.cycle, " added cycles: ", tCycles)
 
-	if int(graphic.LY) >= SCANLINES_PER_FRAME {
-
-		graphic.mode = MODE_VBLANK
-		if graphic.LY == SCANLINES_PER_FRAME {
-			fmt.Println("Entering Vblank")
+	if int(graphic.getLY()) >= SCANLINES_PER_FRAME {
+		fmt.Println("Entering VBLANK")
+		graphic.setMode(MODE_VBLANK)
+		//PPUmode = MODE_VBLANK
+		if graphic.getLY() == SCANLINES_PER_FRAME {
+			// fmt.Println("Entering Vblank")
 			graphic.cpu.IF |= 1 << 0
 			graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
 		}
 	} else {
 		if graphic.cycle >= 456-80 {
-			if graphic.mode != MODE_OAMSCAN {
-				fmt.Println("Entering oam scan")
-
+			//if graphic.cycle < 80 {
+			if graphic.cpu.Memory[0xFF41] != MODE_OAMSCAN {
+				fmt.Println("Entering OAMSCAN")
 			}
-			graphic.mode = MODE_OAMSCAN
+			//fmt.Println("Entering OAMSCAN")
+			graphic.setMode(MODE_OAMSCAN)
+
+			//PPUmode = MODE_OAMSCAN
 		} else if graphic.cycle >= 456-80-172 {
-			if graphic.mode != MODE_DRAWING {
+			//} else if graphic.cycle < 172 {
+			if graphic.cpu.Memory[0xFF41] != MODE_DRAWING {
 				fmt.Println("Entering drawing mode")
-
 			}
-			graphic.mode = MODE_DRAWING
+			//PPUmode = MODE_DRAWING
+			//fmt.Println("Entering Drawing")
+			graphic.setMode(MODE_DRAWING)
+
 			graphic.renderScanline()
 		} else {
-			if graphic.mode != MODE_HBLANK {
+			if graphic.cpu.Memory[0xFF41] != MODE_HBLANK {
 				fmt.Println("Entering Hblank")
 			}
-			graphic.mode = MODE_HBLANK
+			//PPUmode = MODE_HBLANK
+			//fmt.Println("Entering HBLANK")
+			graphic.setMode(MODE_HBLANK)
+
 		}
 
 	}
 	if graphic.cycle >= CYCLES_PER_LINE {
 		graphic.cycle -= CYCLES_PER_LINE
-		graphic.LY++
+		graphic.cpu.Memory[0xFF44]++
 
-		if graphic.LY > TOTAL_LINES-1 {
-			graphic.LY = 0
+		if graphic.getLY() > TOTAL_LINES-1 {
+			graphic.cpu.Memory[0xFF44] = 0
 			fmt.Println("reset ly, start new frame")
 		}
 	}
 
-	fmt.Printf("LY: %d Cycles: %d mode: %d  \n", graphic.LY, graphic.cycle, graphic.mode)
+	// fmt.Printf("LY: %d Cycles: %d mode: %d  \n", graphic.getLY(), graphic.cycle, PPUmode)
 }
 
-func (graphic *Graphics) testPixelDrawing() {
-	for y := 0; y < width; y++ {
-		for x := 0; x < height; x++ {
-			rl.DrawPixel(int32(x), int32(y), rl.Black)
-		}
-	}
-}
-
-//		7				  6					5					4
-//LCD & PPU enable	Window tile map		Window enable	BG & Window tiles
-
+//	7				  6					5					4
+//
+// LCD & PPU enable	Window tile map		Window enable	BG & Window tiles
+//
 //	3			2			1				0
 //
 // BG tile map	OBJ size	OBJ enable	BG & Window enable / priority
 func (graphic *Graphics) lcdControlBits() (byte, byte, byte, byte, byte, byte, byte, byte) {
-	LCDEnable := graphic.LCDC & (1 << 7)
-	windowTileMapArea := graphic.LCDC & (1 << 6) // 0 = 9800–9BFF; 1 = 9C00–9FFF
-	windowEnable := graphic.LCDC & (1 << 5)
-	bgWinTileDataArea := graphic.LCDC & (1 << 4) //0 = 8800–97FF; 1 = 8000–8FFF
-	bgTileDataArea := graphic.LCDC & (1 << 3)    //0 = 9800–9BFF; 1 = 9C00–9FFF
-	objSize := graphic.LCDC & (1 << 2)           //0 = 8×8; 1 = 8×16
-	objEnable := graphic.LCDC & (1 << 1)
-	bgWinEnable := graphic.LCDC & (1 << 0)
+	LCDEnable := graphic.getLCDC() & (1 << 7)
+	windowTileMapArea := graphic.getLCDC() & (1 << 6) // 0 = 9800–9BFF; 1 = 9C00–9FFF
+	windowEnable := graphic.getLCDC() & (1 << 5)
+	bgWinTileDataArea := graphic.getLCDC() & (1 << 4) //0 = 8800–97FF; 1 = 8000–8FFF
+	bgTileDataArea := graphic.getLCDC() & (1 << 3)    //0 = 9800–9BFF; 1 = 9C00–9FFF
+	objSize := graphic.getLCDC() & (1 << 2)           //0 = 8×8; 1 = 8×16
+	objEnable := graphic.getLCDC() & (1 << 1)
+	bgWinEnable := graphic.getLCDC() & (1 << 0)
 	return LCDEnable, windowTileMapArea, windowEnable, bgWinTileDataArea, bgTileDataArea, objSize, objEnable, bgWinEnable
 }
 
@@ -964,17 +610,67 @@ func (graphic *Graphics) lcdControlBits() (byte, byte, byte, byte, byte, byte, b
 //
 // Mode 0 int select		LYC == LY	PPU mode
 func (graphic *Graphics) lcdStatusBits() (byte, byte, byte, byte, byte, byte) {
-	LYCSelect := graphic.STAT & (1 << 6) //If set, selects the LYC == LY condition for the STAT interrupt
-	mode2 := graphic.STAT & (1 << 5)     //f set, selects the Mode 2 condition for the STAT interrupt.
-	mode1 := graphic.STAT & (1 << 4)     //If set, selects the Mode 1 condition for the STAT interrupt.
-	mode0 := graphic.STAT & (1 << 3)     //If set, selects the Mode 0 condition for the STAT interrupt.
-	LYCeqLY := graphic.STAT & (1 << 2)   //Set when LY contains the same value as LYC; it is constantly updated.
-	PPUMode := graphic.STAT&(1<<1) | graphic.STAT&(1<<0)
+	LYCSelect := graphic.getLY() & (1 << 6) //If set, selects the LYC == LY condition for the STAT interrupt
+	mode2 := graphic.getLY() & (1 << 5)     //f set, selects the Mode 2 condition for the STAT interrupt.
+	mode1 := graphic.getLY() & (1 << 4)     //If set, selects the Mode 1 condition for the STAT interrupt.
+	mode0 := graphic.getLY() & (1 << 3)     //If set, selects the Mode 0 condition for the STAT interrupt.
+	LYCeqLY := graphic.getLY() & (1 << 2)   //Set when LY contains the same value as LYC; it is constantly updated.
+	PPUMode := graphic.getLY()&(1<<1) | graphic.getLY()&(1<<0)
 	return LYCSelect, mode2, mode1, mode0, LYCeqLY, PPUMode
 }
 
-//
-//func (graphics *Graphics) PPUcalcCoord() {
-//	bottom := (graphics.SCY + 143) % 255
-//	right := (graphics.SCX + 159) % 255
-//}
+func (graphic *Graphics) setMode(mode uint8) {
+	stat := graphic.getSTAT()
+	//		   clear bit         mask last 2 bits
+	stat = (stat &^ 0b00000011) | (mode & 0b00000011)
+	graphic.cpu.memoryWrite(0xFF41, stat)
+
+}
+
+func drawTiles(vram []uint8, startX int, startY int) {
+	tileWidth := 8
+	tileHeight := 8
+	tileBytes := 16
+	scale := 4
+	tilesPerRow := 16
+
+	totalTiles := len(vram) / tileBytes
+	for tileIdx := 0; tileIdx < totalTiles; tileIdx++ {
+		tileX := tileIdx % tilesPerRow
+		tileY := tileIdx / tilesPerRow
+		//tileX := (tileIdx % tilesPerRow) * tileWidth * scale
+		//tileY := (tileIdx / tilesPerRow) * tileHeight * scale
+
+		screenBaseX := startX + tileX*tileWidth*scale
+		screenBaseY := startY + tileY*tileHeight*scale
+
+		offset := tileIdx * tileBytes
+		if offset+16 > len(vram) {
+			continue
+		}
+		tile := vram[offset : offset+16]
+
+		for y := 0; y < tileHeight; y++ {
+			low := tile[y*2]
+			high := tile[y*2+1]
+			//low := vram[offset+y*2]
+			//high := vram[offset+y*2+1]
+
+			for x := 0; x < tileWidth; x++ {
+				bit := 7 - x
+				msbLow := (low >> bit) & 1
+				msbHigh := (high >> bit) & 1
+				colorId := (msbHigh << 1) | msbLow
+
+				color := colors[colorId]
+
+				// draw scaled pixel
+				screenX := screenBaseX + x*scale
+				screenY := screenBaseY + y*scale
+				//screenX := startX + tileX + (x * scale)
+				//screenY := startY + tileY + (y * scale)
+				rl.DrawRectangle(int32(screenX), int32(screenY), int32(scale), int32(scale), color)
+			}
+		}
+	}
+}
