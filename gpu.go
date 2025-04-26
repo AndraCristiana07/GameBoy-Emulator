@@ -59,8 +59,11 @@ type Sprite struct {
 }
 type Graphics struct {
 	cpu *CPU
+	//pixelBuffer [height][width]uint8
+	pixelBuffer [height][width]uint8
 
-	cycle int
+	drawnLine bool
+	cycle     int
 }
 
 // Priority: 0 = No, 1 = BG and Window colors 1–3 are drawn over this OBJ
@@ -119,16 +122,20 @@ func (graphic *Graphics) readVRAM(address uint16) byte {
 	//return 0
 }
 
-func (graphic *Graphics) dmaTransfer(value uint8) {
+func (cpu *CPU) dmaTransfer(value uint8) {
 	println("dmaTransfer")
 	//upper := uint16(value) / 100
 	upper := uint16(value) << 8
 	//dest := uint16(OAM_START)
 	for i := 0; i < OAM_SIZE; i++ {
-		graphic.cpu.Memory[OAM_START+i] = graphic.cpu.Memory[upper+uint16(i)]
+		fmt.Printf("upper is 0x%02X\n", upper)
+		fmt.Printf("upper with i is 0x%02X\n", upper+uint16(i))
+
+		fmt.Printf("OAM at 0x%02X will be: 0x%02X\n", OAM_START+uint16(i), cpu.Memory[upper+uint16(i)])
+		cpu.Memory[OAM_START+uint16(i)] = cpu.Memory[upper+uint16(i)]
 		// fmt.Printf("DMA Transfer ->  %04X - %02X\n ", i, graphic.cpu.Memory[i])
 	}
-
+	println("done")
 }
 
 func (cpu *CPU) readTileData(address uint16) [8][8]uint8 {
@@ -470,6 +477,7 @@ func (graphic *Graphics) renderScanline() {
 	if int(graphic.getLY()) >= height {
 		return
 	}
+	ly := graphic.getLY()
 
 	bgPixels := graphic.getBackground()
 	winPixels := graphic.getWindow()
@@ -482,11 +490,11 @@ func (graphic *Graphics) renderScanline() {
 		var pixel uint8 = 0 // default white
 
 		// starting with background
-		pixel = bgPixels[graphic.getLY()][screenX]
+		pixel = bgPixels[ly][screenX]
 
 		// window overrides background
-		if graphic.getLCDC()&(1<<5) != 0 && winPixels[graphic.getLY()][screenX] != 0 {
-			pixel = winPixels[graphic.getLY()][screenX]
+		if graphic.getLCDC()&(1<<5) != 0 && winPixels[ly][screenX] != 0 {
+			pixel = winPixels[ly][screenX]
 
 		}
 
@@ -496,27 +504,38 @@ func (graphic *Graphics) renderScanline() {
 		//	pixel = spritePixels[graphic.getLY()][screenX]
 		//}
 		if graphic.getLCDC()&(1<<1) != 0 {
-			spritePixel := spritePixels[graphic.getLY()][screenX]
+			spritePixel := spritePixels[ly][screenX]
 			if spritePixel != 255 && spritePixel != 0 {
 				pixel = spritePixel
 				// fmt.Printf("Sprite pixel override at X: %d, value:%d\n", screenX, spritePixels[screenX])
 
 			}
 		}
-		color := colors[pixel]
+		//color := colors[pixel]
+		graphic.pixelBuffer[ly][screenX] = pixel
 		// fmt.Printf("pixel: %d, color of pixel: %d\n", pixel, color)
 
 		//rl.DrawPixel(int32(screenX), int32(graphic.getLY()), color)
-		scale := 4
-		rl.DrawRectangle(int32(screenX*scale), int32(int(graphic.getLY())*scale), int32(scale), int32(scale), color)
+		//scale := 2
+		//rl.DrawRectangle(int32(screenX*scale), int32(int(ly)*scale), int32(scale), int32(scale), color)
 
+	}
+}
+
+func (graphic *Graphics) drawScreen() {
+	scale := 2
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			colorIdx := graphic.pixelBuffer[y][x]
+			color := colors[colorIdx]
+			rl.DrawRectangle(int32(x*scale), int32(y*scale), int32(scale), int32(scale), color)
+		}
 	}
 }
 
 func (graphic *Graphics) modesHandeling(tCycles int) {
 	// fmt.Println("mode handling")
 	// fmt.Printf("LCDC: 0b%08b\n", graphic.getLCDC())
-	//_, _, _, _, _, PPUmode := graphic.lcdStatusBits()
 	if graphic.cpu == nil {
 		// fmt.Println("Error: graphics.cpu is nil")
 		return
@@ -524,7 +543,6 @@ func (graphic *Graphics) modesHandeling(tCycles int) {
 	if graphic.getLCDC()&(1<<7) == 0 {
 		// fmt.Println("LCD Disabled!")
 		graphic.setMode(MODE_HBLANK)
-		//PPUmode = MODE_HBLANK
 		graphic.cycle = 0
 		return
 	}
@@ -535,37 +553,36 @@ func (graphic *Graphics) modesHandeling(tCycles int) {
 	if int(graphic.getLY()) >= SCANLINES_PER_FRAME {
 		fmt.Println("Entering VBLANK")
 		graphic.setMode(MODE_VBLANK)
-		//PPUmode = MODE_VBLANK
 		if graphic.getLY() == SCANLINES_PER_FRAME {
 			// fmt.Println("Entering Vblank")
-			graphic.cpu.IF |= 1 << 0
-			graphic.cpu.memoryWrite(0xFF0F, graphic.cpu.IF)
+			IF := graphic.cpu.Memory[0xFF0F] | 1<<0
+			graphic.cpu.memoryWrite(0xFF0F, IF)
 		}
 	} else {
-		if graphic.cycle >= 456-80 {
-			//if graphic.cycle < 80 {
+		//if graphic.cycle >= 456-80 {
+		if graphic.cycle < 80 {
 			if graphic.cpu.Memory[0xFF41] != MODE_OAMSCAN {
 				fmt.Println("Entering OAMSCAN")
 			}
 			//fmt.Println("Entering OAMSCAN")
 			graphic.setMode(MODE_OAMSCAN)
 
-			//PPUmode = MODE_OAMSCAN
-		} else if graphic.cycle >= 456-80-172 {
-			//} else if graphic.cycle < 172 {
+			//} else if graphic.cycle >= 456-80-172 {
+		} else if graphic.cycle < 80+172 {
 			if graphic.cpu.Memory[0xFF41] != MODE_DRAWING {
 				fmt.Println("Entering drawing mode")
 			}
-			//PPUmode = MODE_DRAWING
 			//fmt.Println("Entering Drawing")
 			graphic.setMode(MODE_DRAWING)
 
-			graphic.renderScanline()
+			if !graphic.drawnLine {
+				graphic.renderScanline()
+				graphic.drawnLine = true
+			}
 		} else {
 			if graphic.cpu.Memory[0xFF41] != MODE_HBLANK {
 				fmt.Println("Entering Hblank")
 			}
-			//PPUmode = MODE_HBLANK
 			//fmt.Println("Entering HBLANK")
 			graphic.setMode(MODE_HBLANK)
 
@@ -574,14 +591,20 @@ func (graphic *Graphics) modesHandeling(tCycles int) {
 	}
 	if graphic.cycle >= CYCLES_PER_LINE {
 		graphic.cycle -= CYCLES_PER_LINE
+		graphic.drawnLine = false
+
+		fmt.Printf("ly inc to : %d\n", graphic.getLY()+1)
 		graphic.cpu.Memory[0xFF44]++
 
-		if graphic.getLY() > TOTAL_LINES-1 {
+		if graphic.getLY() >= TOTAL_LINES-1 {
 			graphic.cpu.Memory[0xFF44] = 0
+
+			graphic.cycle = 0
+
 			fmt.Println("reset ly, start new frame")
 		}
 	}
-
+	//graphic.cpu.Memory[0xFF44] = (graphic.cpu.Memory[0xFF44] + 1) % 154
 	// fmt.Printf("LY: %d Cycles: %d mode: %d  \n", graphic.getLY(), graphic.cycle, PPUmode)
 }
 
@@ -631,7 +654,7 @@ func drawTiles(vram []uint8, startX int, startY int) {
 	tileWidth := 8
 	tileHeight := 8
 	tileBytes := 16
-	scale := 4
+	scale := 2
 	tilesPerRow := 16
 
 	totalTiles := len(vram) / tileBytes
@@ -670,6 +693,108 @@ func drawTiles(vram []uint8, startX int, startY int) {
 				//screenX := startX + tileX + (x * scale)
 				//screenY := startY + tileY + (y * scale)
 				rl.DrawRectangle(int32(screenX), int32(screenY), int32(scale), int32(scale), color)
+			}
+		}
+	}
+}
+
+func drawSprites(oam []uint8, vram []uint8, startX int, startY int) {
+	spriteCount := 40
+	spriteWidth := 8
+	spriteHeight := 8
+	scale := 2
+
+	for i := 0; i < spriteCount; i++ {
+		spriteAddr := i * 4
+		y := int(oam[spriteAddr]) - 16
+		x := int(oam[spriteAddr+1]) - 8
+		tileIndex := int(oam[spriteAddr+2])
+		//attributes := int(oam[spriteAddr+3])
+
+		if tileIndex*16+16 > len(vram) {
+			fmt.Printf("Draw sprites - INVALID")
+			continue
+		}
+		if tileIndex < 0 || tileIndex >= 384 {
+			fmt.Printf("Draw sprites - out of bounds")
+			continue
+		}
+
+		tileStart := tileIndex * 16
+		if tileStart+16 > len(vram) {
+			fmt.Printf("Draw sprites - out of vrqm bounds")
+			continue
+		}
+
+		tileData := vram[tileStart : tileStart+16]
+
+		for ty := 0; ty < spriteHeight; ty++ {
+			low := tileData[ty*2]
+			high := tileData[ty*2+1]
+			for tx := 0; tx < spriteWidth; tx++ {
+				bit := 7 - tx
+				msbLow := (low >> bit) & 1
+				msbHigh := (high >> bit) & 1
+				colorId := (msbHigh << 1) | msbLow
+				if colorId == 0 {
+					fmt.Printf("transparent")
+					continue
+				}
+				//offset := 500
+				//rl.DrawRectangle(int32(startX+x+tx*scale), int32(startY+y+ty*scale), int32(scale), int32(scale), colors[colorId])
+
+				rl.DrawRectangle(int32((startX+x+tx)*scale), int32((startY+y+ty)*scale), int32(scale), int32(scale), rl.Red)
+
+				//rl.DrawRectangle(int32((x+tx)*scale), int32((y+ty)*scale+offset), int32(scale), int32(scale), rl.Red)
+				//rl.DrawPixel(int32(startX+x+tx), int32(startY+y+ty), colors[colorId])
+				//rl.DrawText(fmt.Sprintf("%02d", i), int32((startX+x+tx)*scale), int32((startY+y+ty)*scale), 10, rl.Red)
+			}
+		}
+
+	}
+}
+
+func drawTileMap(vram []uint8, tileMapAddr uint16, tileBaseAddr uint16, startX int, startY int) {
+	tileWidth := 8
+	tileHeight := 8
+	mapWidth := 32
+	mapHeight := 32
+	scale := 2
+
+	//tileMap := vram[tileMapAddr-VRAM_START : tileMapAddr-VRAM_END]
+	tileMapOffset := int(tileMapAddr - 0x8000)
+	tileMap := vram[tileMapOffset : tileMapOffset+1024]
+	for ty := 0; ty < mapHeight; ty++ {
+		for tx := 0; tx < mapWidth; tx++ {
+			tileIndex := tileMap[ty*mapWidth+tx]
+			var tileAddr int
+			if tileBaseAddr == 0x8000 {
+				tileAddr = int(tileIndex) * 16
+			} else {
+				tileAddr = int(int8(tileIndex)) * 16
+				tileAddr += 0x1000 //0x8800
+			}
+
+			if tileAddr < 0 || tileAddr+16 > len(vram) {
+				fmt.Printf("Draw tile map - INVALID")
+				continue
+			}
+			tileData := vram[tileAddr : tileAddr+16]
+			for py := 0; py < tileHeight; py++ {
+				low := tileData[py*2]
+				high := tileData[py*2+1]
+				for px := 0; px < tileWidth; px++ {
+					bit := 7 - px
+					l := (low >> bit) & 1
+					h := (high >> bit) & 1
+					colorID := (h << 1) | l
+					color := colors[colorID]
+					baseX := startX + tx*tileWidth*scale
+					baseY := startY + ty*tileHeight*scale
+					//rl.DrawRectangle(int32((startX+tx*tileWidth+px)*scale), int32((startY+ty*tileHeight+py)*scale), int32(scale), int32(scale), color)
+					rl.DrawRectangle(int32(baseX+px*scale), int32(baseY+py*scale), int32(scale), int32(scale), color)
+
+				}
 			}
 		}
 	}
