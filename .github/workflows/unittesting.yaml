@@ -9,14 +9,18 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    env: 
+      DEBIAN_FRONTEND: noninteractive
+
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Checkout Repo
       uses: actions/checkout@v4
 
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install libwayland-dev libxkbcommon-dev mesa-common-dev libglu1-mesa-dev libx11-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev
+      run: apt-get update && apt-get install -y ca-certificates golang-go libwayland-dev libxkbcommon-dev libglu1-mesa-dev libx11-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev # 
+
     - name: Unit Test
       run: go test -v
     

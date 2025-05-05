@@ -1,0 +1,11 @@
+*.txt
+blargg test
+*.zip
+emu test
+emulicious
+*.pyc
+*.sav
+*.gb
+*.cover
+.vscode
+.idea

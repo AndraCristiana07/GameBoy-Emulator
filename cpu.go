@@ -3,7 +3,11 @@ package main
 
 import (
 	"fmt"
+
+	log "github.com/mgutz/logxi/v1"
 )
+
+var cpulogger log.Logger
 
 // A, B, C, D, E, F, H, and L - 8 bit
 // SP, PC - 16 bit
@@ -48,10 +52,12 @@ const flagH uint8 = 1 << 5 // half carry flag
 const flagC uint8 = 1 << 4 // carry flag
 
 func NewCPU() *CPU {
+	cpulogger = log.New("cpu")
+
 	cpu := &CPU{}
 	cpu.IME = false
-	//// fmt.Println("cpu.grahics", cpu.graphics)
-	//// fmt.Println("cpu.grahics.cpu", cpu.graphics.cpu)
+	//// cpulogger.Debug(fmt.Sprintf(("cpu.grahics", cpu.graphics))
+	//// cpulogger.Debug(fmt.Sprintf(("cpu.grahics.cpu", cpu.graphics.cpu))
 	cpu.Registers.PC = 0x100
 	cpu.Registers.setAF(0x01B0)
 	cpu.Registers.setBC(0x0013)
@@ -183,7 +189,7 @@ func (cpu *CPU) getImmediate8() uint8 {
 	//val := cpu.Memory[cpu.Registers.PC]
 	val := cpu.memoryRead(cpu.Registers.PC)
 	cpu.Registers.PC++
-	fmt.Printf("immediate 8 val: 0x%04X, in memory: 0x%02X  pc now: 0x%04X \n", val, cpu.Memory[val], cpu.Registers.PC)
+	cpulogger.Debug(fmt.Sprintf("immediate 8 val: 0x%04X, in memory: 0x%02X  pc now: 0x%04X ", val, cpu.Memory[val], cpu.Registers.PC))
 
 	return val
 }
@@ -196,27 +202,27 @@ func (cpu *CPU) getImmediate16() uint16 {
 	val2 := cpu.memoryRead(cpu.Registers.PC + 1)
 	res := uint16(val1) | uint16(val2)<<8
 	cpu.Registers.PC += 2
-	fmt.Printf("immediate 16 val: 0x%04X, in memory: 0x%02X val1: 0x%02X and val2: 0x%02X pc now: 0x%04X \n", res, cpu.Memory[res], val1, val2, cpu.Registers.PC)
+	cpulogger.Debug(fmt.Sprintf("immediate 16 val: 0x%04X, in memory: 0x%02X val1: 0x%02X and val2: 0x%02X pc now: 0x%04X", res, cpu.Memory[res], val1, val2, cpu.Registers.PC))
 	return res
 }
 
 func (cpu *CPU) inc(reg uint8) uint8 {
-	fmt.Println("INC")
+	cpulogger.Debug("INC")
 
 	//Set if carry from bit 3
 	halfCarry := (reg & 0x0F) == 0x0F
-	fmt.Printf("inc reg val: 0x%04X\n", reg)
+	cpulogger.Debug(fmt.Sprintf("inc reg val: 0x%04X", reg))
 	res := reg + 1
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, halfCarry)
-	fmt.Printf("inc reg val+1: 0x%04X\n", res)
+	cpulogger.Debug(fmt.Sprintf("inc reg val+1: 0x%04X", res))
 	return uint8(res)
 
 }
 
 func (cpu *CPU) dec(reg uint8) uint8 {
-	fmt.Println("DEC")
+	cpulogger.Debug("DEC")
 	res := reg - 1
 
 	//Set if no borrow from bit 4
@@ -229,7 +235,7 @@ func (cpu *CPU) dec(reg uint8) uint8 {
 }
 
 func (cpu *CPU) addA(reg uint8) uint8 {
-	fmt.Println("ADD")
+	cpulogger.Debug("ADD")
 
 	a := cpu.Registers.A
 	res := uint16(a) + uint16(reg)
@@ -243,7 +249,7 @@ func (cpu *CPU) addA(reg uint8) uint8 {
 }
 
 func (cpu *CPU) adcA(reg uint8) uint8 {
-	fmt.Println("ADC")
+	cpulogger.Debug("ADC")
 
 	a := cpu.Registers.A
 	carry := uint8(0)
@@ -262,7 +268,7 @@ func (cpu *CPU) adcA(reg uint8) uint8 {
 }
 
 func (cpu *CPU) subA(reg uint8) uint8 {
-	fmt.Println("SUB")
+	cpulogger.Debug("SUB")
 
 	a := cpu.Registers.A
 	res := uint16(a) - uint16(reg)
@@ -276,7 +282,7 @@ func (cpu *CPU) subA(reg uint8) uint8 {
 }
 
 func (cpu *CPU) sbcA(reg uint8) uint8 {
-	fmt.Println("SBC")
+	cpulogger.Debug("SBC")
 
 	carry := uint8(0)
 	if cpu.Registers.getFlag(flagC) {
@@ -294,7 +300,7 @@ func (cpu *CPU) sbcA(reg uint8) uint8 {
 }
 
 func (cpu *CPU) cpA(reg uint8) {
-	fmt.Println("CP")
+	cpulogger.Debug("CP")
 
 	a := cpu.Registers.A
 	res := uint16(a) - uint16(reg)
@@ -317,14 +323,13 @@ func (cpu *CPU) fetchOpcode() uint8 {
 func (cpu *CPU) fetchCBOpcode() uint8 {
 	//cbOpcode := cpu.Memory[cpu.Registers.PC]
 	cbOpcode := cpu.memoryRead(cpu.Registers.PC)
-	fmt.Printf("CB Opcode in fetch: 0x%02X", cbOpcode)
+	cpulogger.Debug(fmt.Sprintf("CB Opcode in fetch: 0x%02X", cbOpcode))
 	cpu.Registers.PC++
 	return cbOpcode
 }
 
 func (cpu *CPU) push(n uint16) {
-
-	fmt.Println("PUSH")
+	cpulogger.Debug("PUSH")
 	hi := (n & 0xFF00) >> 8
 	lo := n & 0xFF
 	cpu.Registers.SP -= 2
@@ -336,12 +341,12 @@ func (cpu *CPU) push(n uint16) {
 }
 
 func (cpu *CPU) pop() uint16 {
-	fmt.Println("POP")
+	cpulogger.Debug("POP")
 	//lo := uint16(cpu.Memory[cpu.Registers.SP])
 	//hi := uint16(cpu.Memory[cpu.Registers.SP+1])
 	lo := uint16(cpu.memoryRead(cpu.Registers.SP))
 	hi := uint16(cpu.memoryRead(cpu.Registers.SP + 1))
-	//// fmt.Printf("POP -> lower: 0x%02X and highrr: 0x%02X\n", lo, hi)
+	//// cpulogger.Debug(fmt.Sprintf("POP -> lower: 0x%02X and highrr: 0x%02X\n", lo, hi)
 	cpu.Registers.SP += 2
 
 	//res := uint16(hi)<<8 | uint16(lo)
@@ -351,13 +356,13 @@ func (cpu *CPU) pop() uint16 {
 }
 
 func (cpu *CPU) execRST(address uint16) {
-	fmt.Println("RST")
+	cpulogger.Debug("RST")
 	// Push present address onto stack.
 	// Jump to address $0000 + n.
 	cpu.Registers.SP -= 2
 	hi := (cpu.Registers.PC & 0xFF00) >> 8
 	lo := cpu.Registers.PC & 0xFF
-	//fmt.Printf("RST- SP before: 0x%04X\n", cpu.Registers.SP)
+	//cpulogger.Debug(fmt.Sprintf("RST- SP before: 0x%04X\n", cpu.Registers.SP)
 	//cpu.Memory[cpu.Registers.SP] = uint8(cpu.Registers.PC & 0xFF) //lower byte
 	//cpu.memoryWrite(cpu.Registers.SP, uint8(cpu.Registers.PC&0xFF)) //lower byte
 	cpu.memoryWrite(cpu.Registers.SP, uint8(lo)) //lower byte
@@ -365,14 +370,14 @@ func (cpu *CPU) execRST(address uint16) {
 	cpu.memoryWrite(cpu.Registers.SP+1, uint8(hi)) //upper byte
 
 	cpu.Registers.PC = address
-	fmt.Printf("PC now: 0x%04X and in memory 0x%02X\n", cpu.Registers.PC, cpu.Memory[cpu.Registers.PC])
-	//fmt.Printf("Pc after  0x%04X sp = 0x%04X\n", cpu.Registers.PC, cpu.Registers.SP)
+	cpulogger.Debug(fmt.Sprintf("PC now: 0x%04X and in memory 0x%02X\n", cpu.Registers.PC, cpu.Memory[cpu.Registers.PC]))
+	//cpulogger.Debug(fmt.Sprintf("Pc after  0x%04X sp = 0x%04X\n", cpu.Registers.PC, cpu.Registers.SP)
 
 }
 
 func (cpu *CPU) execBIT(reg uint8, bit uint8) {
 	//Test bit b in register r
-	fmt.Println("BIT")
+	cpulogger.Debug("BIT")
 
 	res := reg & (1 << bit)
 	cpu.Registers.setFlag(flagZ, res == 0x00)
@@ -382,7 +387,7 @@ func (cpu *CPU) execBIT(reg uint8, bit uint8) {
 
 func (cpu *CPU) execBITHL(bit uint8) {
 	//Test bit b in register r
-	fmt.Println("BIT HL")
+	cpulogger.Debug("BIT HL")
 
 	//res := cpu.Memory[cpu.Registers.getHL()] & (1 << bit)
 	res := cpu.memoryRead(cpu.Registers.getHL()) & (1 << bit)
@@ -394,14 +399,14 @@ func (cpu *CPU) execBITHL(bit uint8) {
 
 func (cpu *CPU) execSET(reg uint8, bit uint8) uint8 {
 	//Set bit b in register r
-	fmt.Println("SET")
+	cpulogger.Debug("SET")
 
 	return reg | (1 << bit)
 }
 
 func (cpu *CPU) execSETHL(bit uint8) {
 	//Set bit b in register r
-	fmt.Println("SET HL")
+	cpulogger.Debug("SET HL")
 
 	//cpu.Memory[cpu.Registers.getHL()] = cpu.Memory[cpu.Registers.getHL()] | (1 << bit)
 	cpu.memoryWrite(cpu.Registers.getHL(), cpu.Memory[cpu.Registers.getHL()]|(1<<bit))
@@ -409,14 +414,14 @@ func (cpu *CPU) execSETHL(bit uint8) {
 
 func (cpu *CPU) execRES(reg uint8, bit uint8) uint8 {
 	//Reset bit b in register r
-	fmt.Println("RES")
+	cpulogger.Debug("RES")
 
 	return reg & ^(1 << bit)
 }
 
 func (cpu *CPU) execRESHL(bit uint8) {
 	//Reset bit b in register r
-	fmt.Println("RES HL")
+	cpulogger.Debug("RES HL")
 
 	addr := cpu.Registers.getHL()
 	val := cpu.memoryRead(addr)
@@ -425,7 +430,7 @@ func (cpu *CPU) execRESHL(bit uint8) {
 }
 
 func (cpu *CPU) execSWAP(reg uint8) uint8 {
-	fmt.Println("SWAP")
+	cpulogger.Debug("SWAP")
 
 	//Swap upper & lower nibles of n
 	reg = (reg >> 4) | ((reg & 0x0F) << 4)
@@ -437,7 +442,7 @@ func (cpu *CPU) execSWAP(reg uint8) uint8 {
 }
 
 func (cpu *CPU) execSWAPHL() uint8 {
-	fmt.Println("SWAP HL")
+	cpulogger.Debug("SWAP HL")
 
 	//Swap upper & lower nibles of n
 	//cpu.Memory[cpu.Registers.getHL()] = (cpu.Memory[cpu.Registers.getHL()] >> 4) | (cpu.Memory[cpu.Registers.getHL()] << 4)
@@ -453,7 +458,7 @@ func (cpu *CPU) execSWAPHL() uint8 {
 
 func (cpu *CPU) execSLA(reg uint8) uint8 {
 	//Shift n left into Carry. LSB of n set to 0.
-	fmt.Println("SLA")
+	cpulogger.Debug("SLA")
 
 	carry := (reg & 0x80) >> 7
 	res := reg << 1
@@ -466,7 +471,7 @@ func (cpu *CPU) execSLA(reg uint8) uint8 {
 
 func (cpu *CPU) execSLAHL() {
 	//Shift n left into Carry. LSB of n set to 0.
-	fmt.Println("SLA HL")
+	cpulogger.Debug("SLA HL")
 
 	//carry := (cpu.Memory[cpu.Registers.getHL()] & 0x80) >> 7
 	carry := (cpu.memoryRead(cpu.Registers.getHL()) & 0x80) >> 7
@@ -485,7 +490,7 @@ func (cpu *CPU) execSLAHL() {
 
 func (cpu *CPU) execSRA(reg uint8) uint8 {
 	//Shift n right into Carry. MSB doesn't change.
-	fmt.Println("SRA")
+	cpulogger.Debug("SRA")
 
 	carry := reg & 0x01
 	reg = (reg >> 1) | (reg & 0x80)
@@ -498,7 +503,7 @@ func (cpu *CPU) execSRA(reg uint8) uint8 {
 
 func (cpu *CPU) execSRAHL() {
 	//Shift n right into Carry. MSB doesn't change.
-	fmt.Println("SRA HL")
+	cpulogger.Debug("SRA HL")
 	hl := cpu.memoryRead(cpu.Registers.getHL())
 	carry := hl & 0x01
 	//cpu.Memory[cpu.Registers.getHL()] = (cpu.Memory[cpu.Registers.getHL()] >> 1) | (cpu.Memory[cpu.Registers.getHL()] & 0x80)
@@ -511,7 +516,7 @@ func (cpu *CPU) execSRAHL() {
 }
 func (cpu *CPU) execSRL(reg uint8) uint8 {
 	//Shift n right into Carry. MSB set to 0.
-	fmt.Println("SRL")
+	cpulogger.Debug("SRL")
 
 	carry := reg & 0x01
 	reg = reg >> 1
@@ -524,7 +529,7 @@ func (cpu *CPU) execSRL(reg uint8) uint8 {
 
 func (cpu *CPU) execSRLHL() {
 	//Shift n right into Carry. MSB set to 0.
-	fmt.Println("SRL HL")
+	cpulogger.Debug("SRL HL")
 	hl := cpu.memoryRead(cpu.Registers.getHL())
 	carry := hl & 0x01
 	//cpu.Memory[cpu.Registers.getHL()] = cpu.Memory[cpu.Registers.getHL()] >> 1
@@ -536,27 +541,28 @@ func (cpu *CPU) execSRLHL() {
 	cpu.Registers.setFlag(flagH, false)
 }
 
-func (cpu *CPU) execRLC(reg uint8) {
+func (cpu *CPU) execRLC(reg uint8) uint8 {
 	//Rotate n left. Old bit 7 to Carry flag
-	fmt.Println("RLC")
+	cpulogger.Debug("RLC")
 	carry := (reg & 0x80) >> 7
 	reg = reg << 1
 	cpu.Registers.setFlag(flagC, carry == 0x00)
 	cpu.Registers.setFlag(flagZ, reg == 0x00)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
+	return reg
 
 }
 
 func (cpu *CPU) execRLCHL() {
-	fmt.Println("RLC HL")
+	cpulogger.Debug("RLC HL")
 
 	//Rotate n left. Old bit 7 to Carry flag
 	carry := (cpu.Memory[cpu.Registers.getHL()] & 0x80) >> 7
 	//cpu.Memory[cpu.Registers.getHL()] = cpu.Memory[cpu.Registers.getHL()] << 1
 	addr := cpu.memoryRead(cpu.Registers.getHL())
 	val := addr << 1
-	cpu.memoryWrite(uint16(addr), val)
+	cpu.memoryWrite(cpu.Registers.getHL(), val)
 	cpu.Registers.setFlag(flagC, carry == 0x00)
 	cpu.Registers.setFlag(flagZ, cpu.Memory[cpu.Registers.getHL()] == 0x00)
 	cpu.Registers.setFlag(flagN, false)
@@ -565,7 +571,7 @@ func (cpu *CPU) execRLCHL() {
 }
 
 func (cpu *CPU) execRL(reg uint8) uint8 {
-	fmt.Println("RL")
+	cpulogger.Debug("RL")
 	// Rotate n left through Carry flag.
 
 	oldCarry := uint8(0)
@@ -582,23 +588,26 @@ func (cpu *CPU) execRL(reg uint8) uint8 {
 }
 
 func (cpu *CPU) execRLHL() {
-	fmt.Println("RL HL")
+	cpulogger.Debug("RL HL")
 	// Rotate n left through Carry flag.
 
 	oldCarry := uint8(0)
 	if cpu.Registers.getFlag(flagC) {
 		oldCarry = 1
 	}
-	newCarry := cpu.Memory[cpu.Registers.getHL()] & 0x80 //store bit 7
-	cpu.Registers.setHL(uint16((cpu.Memory[cpu.Registers.getHL()] << 1) | oldCarry))
+	hl := cpu.memoryRead(cpu.Registers.getHL())
+	newCarry := cpu.memoryRead(cpu.Registers.getHL()) & 0x80 //store bit 7
+	reg := (hl << 1) | oldCarry
+	cpu.memoryWrite(cpu.Registers.getHL(), reg)
+	//cpu.Registers.setHL(uint16((cpu.Memory[cpu.Registers.getHL()] << 1) | oldCarry))
 	cpu.Registers.setFlag(flagC, newCarry == 0x01)
 	cpu.Registers.setFlag(flagZ, cpu.Memory[cpu.Registers.getHL()] == 0)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
 }
 
-func (cpu *CPU) execRRC(reg uint8) {
-	fmt.Println("RRC")
+func (cpu *CPU) execRRC(reg uint8) uint8 {
+	cpulogger.Debug("RRC")
 	// Rotate n right. Old bit 0 to Carry flag
 	c := reg&0x01 == 0x01
 	reg >>= 1
@@ -606,21 +615,26 @@ func (cpu *CPU) execRRC(reg uint8) {
 	cpu.Registers.setFlag(flagC, c)
 	cpu.Registers.setFlag(flagN, false) //reset
 	cpu.Registers.setFlag(flagH, false) //reset
+	return reg
 }
 
 func (cpu *CPU) execRRCHL() {
-	fmt.Println("RRC HL")
+	cpulogger.Debug("RRC HL")
 	// Rotate n right. Old bit 0 to Carry flag
-	c := cpu.Memory[cpu.Registers.getHL()]&0x01 == 0x01
-	cpu.Memory[cpu.Registers.getHL()] >>= 1
-	cpu.Registers.setFlag(flagZ, cpu.Memory[cpu.Registers.getHL()] == 0)
-	cpu.Registers.setFlag(flagC, c)
+	//c := cpu.Memory[cpu.Registers.getHL()]&0x01 == 0x01
+	hl := cpu.memoryRead(cpu.Registers.getHL())
+	carry := hl&0x01 == 0x01
+	reg := hl >> 1
+	cpu.memoryWrite(cpu.Registers.getHL(), reg)
+	//cpu.Memory[cpu.Registers.getHL()] >>= 1
+	cpu.Registers.setFlag(flagZ, hl == 0)
+	cpu.Registers.setFlag(flagC, carry)
 	cpu.Registers.setFlag(flagN, false) //reset
 	cpu.Registers.setFlag(flagH, false) //reset
 }
 
 func (cpu *CPU) execRR(reg uint8) uint8 {
-	fmt.Println("RR")
+	cpulogger.Debug("RR")
 	//Rotate n right through Carry flag.
 	oldCarry := uint8(0)
 	if cpu.Registers.getFlag(flagC) {
@@ -636,15 +650,19 @@ func (cpu *CPU) execRR(reg uint8) uint8 {
 }
 
 func (cpu *CPU) execRRHL() {
-	fmt.Println("RR HL")
+	cpulogger.Debug("RR HL")
 	//Rotate n right through Carry flag.
 	oldCarry := uint8(0)
 	if cpu.Registers.getFlag(flagC) {
 		oldCarry = 1
 	}
-	hl := cpu.memoryRead(uint16(cpu.Registers.getHL()))
+	hl := cpu.memoryRead(cpu.Registers.getHL())
+
 	newCarry := hl & 0x01 //store bit 0
-	cpu.Registers.setHL(uint16((hl >> 1) | oldCarry<<7))
+
+	reg := (hl >> 1) | oldCarry<<7
+	cpu.memoryWrite(cpu.Registers.getHL(), reg)
+	//cpu.Registers.setHL(uint16((hl >> 1) | oldCarry<<7))
 	cpu.Registers.setFlag(flagZ, hl == 0)
 	cpu.Registers.setFlag(flagC, newCarry == 0x01)
 	cpu.Registers.setFlag(flagN, false) //reset
@@ -712,7 +730,7 @@ func (cpu *CPU) memoryWrite(address uint16, value byte) {
 	//TODO: add more if they exist
 	if address >= 0xC000 && address <= 0xCFFF {
 		if address == 0xC010 {
-			fmt.Printf("writing to 0xC010 value: 0x%02X\n", value)
+			cpulogger.Debug(fmt.Sprintf("writing to 0xC010 value: 0x%02X", value))
 		}
 		cpu.Memory[address] = value
 		cpu.Memory[address+0x2000] = value //?
@@ -724,21 +742,21 @@ func (cpu *CPU) memoryWrite(address uint16, value byte) {
 	} else if address >= VRAM_START && address <= VRAM_END {
 		//cpu.graphics.writeVRAM(address, value)
 		cpu.Memory[address] = value
-		fmt.Printf("VRAM write ->  address: 0x%02X, value: 0b%08b\n", address, value)
+		cpulogger.Debug(fmt.Sprintf("VRAM write ->  address: 0x%02X, value: 0b%08b", address, value))
 	} else if address >= OAM_START && address <= OAM_END {
-		fmt.Printf("OAM write ->  address: 0x%02X, value: 0b%08b\n", address, value)
+		cpulogger.Debug(fmt.Sprintf("OAM write ->  address: 0x%02X, value: 0b%08b", address, value))
 		cpu.Memory[address] = value
 		//DEBUG
-	} else if address == 0xFF01 {
-		fmt.Printf("writing to 0xFF01 value: 0x%02X\n", value)
-	} else if address == 0xFF02 {
-		fmt.Printf("writing to 0xFF02 value: 0x%02X\n", value)
+		//} else if address == 0xFF01 {
+		//	cpulogger.Debug(fmt.Sprintf("writing to 0xFF01 value: 0x%02X\n", value)
+		//} else if address == 0xFF02 {
+		//	cpulogger.Debug(fmt.Sprintf("writing to 0xFF02 value: 0x%02X\n", value)
 	} else if address == 0xFF46 {
 		cpu.Memory[address] = value
 		cpu.dmaTransfer(value)
 
 	} else if address == 0xFF40 {
-		//// fmt.Printf("!!LCDC WRITE: 0x%02X\n", value)
+		//// cpulogger.Debug(fmt.Sprintf("!!LCDC WRITE: 0x%02X\n", value)
 		cpu.Memory[address] = value
 	} else {
 		cpu.Memory[address] = value
@@ -775,17 +793,20 @@ func (cpu *CPU) execOpcodes() int {
 	}
 	//cpu.Memory[0xFF40] |= 1 << 7
 	var tCycles int
-	// fmt.Printf("Before instructiins => PC: 0x%04X | Memory[0x0039]: 0x%02X\n", cpu.Registers.PC, cpu.Memory[0x0039])
+	// cpulogger.Debug(fmt.Sprintf("Before instructiins => PC: 0x%04X | Memory[0x0039]: 0x%02X\n", cpu.Registers.PC, cpu.Memory[0x0039])
 
-	//fmt.Printf("Executing opcode: 0x%02X\n", opcode)
+	//cpulogger.Debug(fmt.Sprintf("Executing opcode: 0x%02X\n", opcode)
 	opcode := cpu.fetchOpcode()
-	fmt.Printf("Opcode in fetch: 0x%X ; PC now:  0x%02X ; SP now: 0x%02X\n", opcode, cpu.Registers.PC, cpu.Registers.SP)
+	cpulogger.Debug("", opcode)
+	cpulogger.Debug("", cpu.Registers.PC)
+	cpulogger.Debug("", cpu.Registers.SP)
+	cpulogger.Debug("Opcode in fetch: 0x%X ; PC now:  0x%02X ; SP now: 0x%02X", opcode, cpu.Registers.PC, cpu.Registers.SP)
 
-	//// fmt.Printf("pc: 0x%04X and opcode: 0x%02X\n", cpu.Registers.PC, opcode)
+	//// cpulogger.Debug(fmt.Sprintf("pc: 0x%04X and opcode: 0x%02X\n", cpu.Registers.PC, opcode)
 	switch opcode {
 
 	case 0b1: // 0x01 -> LD BC, imm16
-		cpu.Registers.setBC(uint16(cpu.getImmediate16()))
+		cpu.Registers.setBC(cpu.getImmediate16())
 		tCycles = 12
 
 	case 0b10: // 0x02 -> LD [BC], A
@@ -841,30 +862,31 @@ func (cpu *CPU) execOpcodes() int {
 		// address and jump to it
 		n := int8(cpu.getImmediate8())
 
-		//// fmt.Printf("Immediate 8 in 0x20: 0x%04X", n)
+		//// cpulogger.Debug(fmt.Sprintf("Immediate 8 in 0x20: 0x%04X", n)
 		if cpu.Registers.getFlag(flagZ) == false {
 
 			//cpu.Registers.PC += uint16(n)
-			fmt.Println("JR NZ taken: ")
-			fmt.Printf("PC before jr : 0x%04X\n", cpu.Registers.PC)
-			fmt.Printf("PC will now be %02X\n ", uint16(int32(cpu.Registers.PC)+int32(n)))
+			cpulogger.Debug("JR NZ taken: ")
+			cpulogger.Debug(fmt.Sprintf("PC before jr : 0x%04X", cpu.Registers.PC))
+			//cpulogger.Debug(fmt.Sprintf("PC before jr : 0x%04X\n", cpu.Registers.PC)
+			cpulogger.Debug(fmt.Sprintf("PC will now be %02X ", uint16(int32(cpu.Registers.PC)+int32(n))))
 
 			cpu.Registers.PC = uint16(int32(cpu.Registers.PC) + int32(n))
-			fmt.Printf("PC after jr nz imm : 0x%04X\n", cpu.Registers.PC)
+			cpulogger.Debug(fmt.Sprintf("PC after jr nz imm : 0x%04X", cpu.Registers.PC))
 			tCycles = 12
 
 		} else {
-			fmt.Println("JR NZ not taken")
+			cpulogger.Debug("JR NZ not taken")
 			tCycles = 20
 
 		}
-		//// fmt.Printf(string(flagZ))
-		//// fmt.Printf(string(n))
+		//// cpulogger.Debug(fmt.Sprintf(string(flagZ))
+		//// cpulogger.Debug(fmt.Sprintf(string(n))
 
 	case 0b100001: // 0x21 -> LD HL, n16  // pc 0x247 ? imm 0xff26
 		n := cpu.getImmediate16()
 		cpu.Registers.setHL(uint16(n))
-		// fmt.Println("LD HL : immed: ", n)
+		// cpucpulogger.Debug("LD HL : immed: ", n)
 		tCycles = 12
 
 	case 0b100010: // 0x22 -> LD [HL+], A
@@ -879,17 +901,19 @@ func (cpu *CPU) execOpcodes() int {
 	case 0b101000: // 0x28 -> JR Z, e8
 		// If flagZ is set then add n to current
 		// address and jump to it
+		//cpulogger.Debug(fmt.Sprintf("pc before jr %04X", cpu.Registers.PC)
 		n := int8(cpu.getImmediate8())
 		if cpu.Registers.getFlag(flagZ) {
 			//cpu.Registers.PC += uint16(n)
 			cpu.Registers.PC = uint16(int32(cpu.Registers.PC) + int32(n))
+			//cpulogger.Debug(fmt.Sprintf("pc after jr %04X", cpu.Registers.PC)
 
 			tCycles = 12
 		} else {
 			tCycles = 8
 		}
-		// fmt.Printf(string(flagZ))
-		// fmt.Printf(string(n))
+		// cpulogger.Debug(fmt.Sprintf(string(flagZ))
+		// cpulogger.Debug(fmt.Sprintf(string(n))
 
 	case 0b101001: // 0x29 -> ADD HL, HL
 		cpu.Registers.setHL(cpu.Registers.getHL() + cpu.Registers.getHL())
@@ -908,9 +932,11 @@ func (cpu *CPU) execOpcodes() int {
 		// If flagC is not set then add n to current
 		// address and jump to it
 		n := int8(cpu.getImmediate8())
+		cpulogger.Debug(fmt.Sprintf("pc before %04X", cpu.Registers.PC))
 		if !cpu.Registers.getFlag(flagC) {
 			//cpu.Registers.PC += uint16(n)
 			cpu.Registers.PC = uint16(int32(cpu.Registers.PC) + int32(n))
+			cpulogger.Debug(fmt.Sprintf("pc after %04X", cpu.Registers.PC))
 
 			tCycles = 12
 		} else {
@@ -923,7 +949,7 @@ func (cpu *CPU) execOpcodes() int {
 		tCycles = 12
 
 	case 0b110010: // 0x32 -> LD [HL-], A  //??
-		//fmt.Printf()
+		//cpulogger.Debug(fmt.Sprintf()
 		cpu.memoryWrite(cpu.Registers.getHL(), cpu.Registers.A)
 
 		cpu.Registers.setHL(cpu.Registers.getHL() - 1)
@@ -957,9 +983,9 @@ func (cpu *CPU) execOpcodes() int {
 
 	case 0b111110: // 0x3E -> LD A, imm8
 		cpu.Registers.A = cpu.getImmediate8()
-		fmt.Printf("REgisters B %d\n", cpu.Registers.B)
-		fmt.Printf("Register C %d\n", cpu.Registers.C)
-		fmt.Printf("Register BC %d\n", cpu.Registers.getBC())
+		cpulogger.Debug(fmt.Sprintf("REgisters B %d", cpu.Registers.B))
+		cpulogger.Debug(fmt.Sprintf("Register C %d", cpu.Registers.C))
+		cpulogger.Debug(fmt.Sprintf("Register BC %d", cpu.Registers.getBC()))
 		tCycles = 8
 
 	case 0b1000000: // 0x40 -> LD B, B
@@ -1594,6 +1620,7 @@ func (cpu *CPU) execOpcodes() int {
 		// jump to address nn if flagZ is not set
 		n := cpu.getImmediate16()
 		if !cpu.Registers.getFlag(flagZ) {
+			//cpulogger.Debug(fmt.Sprintf("Pc %04b", cpu.Registers.PC)
 			cpu.push(cpu.Registers.PC)
 			cpu.Registers.PC = uint16(n)
 			tCycles = 24
@@ -1623,6 +1650,7 @@ func (cpu *CPU) execOpcodes() int {
 		// jump to address nn if flagZ is  set
 		n := cpu.getImmediate16()
 		if cpu.Registers.getFlag(flagZ) {
+			cpulogger.Debug(fmt.Sprintf("PC %d", &cpu.Registers.PC))
 			cpu.push(cpu.Registers.PC)
 			cpu.Registers.PC = uint16(n)
 			tCycles = 24
@@ -1762,12 +1790,12 @@ func (cpu *CPU) execOpcodes() int {
 		tCycles = 8
 
 	case 0b11110000: // 0xF0 -> LDH A, [a8]
-		fmt.Printf("REgister A before: %d\n", cpu.Registers.A)
+		cpulogger.Debug(fmt.Sprintf("REgister A before: %d", cpu.Registers.A))
 		n := cpu.getImmediate8()
 		addr := 0xFF00 + uint16(n)
 		cpu.Registers.A = cpu.memoryRead(addr)
 		//cpu.Registers.A = cpu.memoryRead(uint16(cpu.getImmediate8()) | 0xFF00)
-		fmt.Printf("REgister A after: %d\n", cpu.Registers.A)
+		cpulogger.Debug(fmt.Sprintf("REgister A after: %d", cpu.Registers.A))
 
 		tCycles = 12
 
@@ -1815,11 +1843,11 @@ func (cpu *CPU) execOpcodes() int {
 	case 0b101: // 0x05 -> DEC B
 		//flags := map[string]string{"Z": "Z", "N": "1", "H": "H", "C": "-"}
 		//cpu.Registers.B--
-		fmt.Printf("Register B before %d\n", cpu.Registers.B)
-		//fmt.Printf("carry flag in  dec before: %v", cpu.Registers.getFlag(flagC))
+		cpulogger.Debug(fmt.Sprintf("Register B before %d", cpu.Registers.B))
+		//cpulogger.Debug(fmt.Sprintf("carry flag in  dec before: %v", cpu.Registers.getFlag(flagC))
 		cpu.Registers.B = cpu.dec(cpu.Registers.B)
-		fmt.Printf("Register B after %0d\n", cpu.Registers.B)
-		//fmt.Printf("carry flag in  dec after: %v", cpu.Registers.getFlag(flagC))
+		cpulogger.Debug(fmt.Sprintf("Register B after %0d", cpu.Registers.B))
+		//cpulogger.Debug(fmt.Sprintf("carry flag in  dec after: %v", cpu.Registers.getFlag(flagC))
 
 		tCycles = 4
 
@@ -1838,11 +1866,11 @@ func (cpu *CPU) execOpcodes() int {
 	case 0b1101: // 0x0D -> DEC C
 		//flags := map[string]string{"Z": "Z", "N": "1", "H": "H", "C": "-"}
 		//cpu.Registers.C--
-		fmt.Printf("REgister C before dec is %d\n", cpu.Registers.C)
-		fmt.Printf("Flag Z before is: %t\n", cpu.Registers.getFlag(flagZ))
+		cpulogger.Debug(fmt.Sprintf("REgister C before dec is %d", cpu.Registers.C))
+		cpulogger.Debug(fmt.Sprintf("Flag Z before is: %t", cpu.Registers.getFlag(flagZ)))
 		cpu.Registers.C = cpu.dec(cpu.Registers.C)
-		fmt.Printf("REgister C after dec is %d\n", cpu.Registers.C)
-		fmt.Printf("Flag Z after is: %t\n", cpu.Registers.getFlag(flagZ))
+		cpulogger.Debug(fmt.Sprintf("REgister C after dec is %d", cpu.Registers.C))
+		cpulogger.Debug(fmt.Sprintf("Flag Z after is: %t", cpu.Registers.getFlag(flagZ)))
 
 		tCycles = 4
 
@@ -1851,7 +1879,7 @@ func (cpu *CPU) execOpcodes() int {
 		//Halt CPU & LCD display until button pressed
 		imm := cpu.getImmediate8()
 		if imm != 0x00 {
-			fmt.Printf("STOP -> imm is 0x%02X", imm)
+			cpulogger.Debug(fmt.Sprintf("STOP -> imm is 0x%02X", imm))
 		}
 		cpu.Registers.PC++
 		//opcode = cpu.fetchOpcode()
@@ -1868,9 +1896,9 @@ func (cpu *CPU) execOpcodes() int {
 		//flags := map[string]string{"Z": "Z", "N": "0", "H": "H", "C": "-"}
 		//cpu.Registers.D++
 		cpu.Registers.D = cpu.inc(cpu.Registers.D)
-		fmt.Println("Flag Z", cpu.Registers.getFlag(flagZ))
-		fmt.Println("Flag N", cpu.Registers.getFlag(flagN))
-		fmt.Println("Flag H", cpu.Registers.getFlag(flagH))
+		cpulogger.Debug("Flag Z", cpu.Registers.getFlag(flagZ))
+		cpulogger.Debug("Flag N", cpu.Registers.getFlag(flagN))
+		cpulogger.Debug("Flag H", cpu.Registers.getFlag(flagH))
 		tCycles = 4
 
 	case 0b10101: // 0x15 -> DEC D
@@ -1881,7 +1909,7 @@ func (cpu *CPU) execOpcodes() int {
 
 	case 0b11000: // 0x18 -> JR e8
 		n := int8(cpu.getImmediate8())
-		// fmt.Printf("Immediate 8 at 0x18: 0x%04X", n)
+		// cpulogger.Debug(fmt.Sprintf("Immediate 8 at 0x18: 0x%04X", n)
 		//cpu.Registers.PC += uint16(n)
 		cpu.Registers.PC = uint16(int32(cpu.Registers.PC) + int32(n))
 
@@ -1987,7 +2015,7 @@ func (cpu *CPU) execOpcodes() int {
 
 	case 0b11000011: // 0xC3 -> JP imm16
 		n := cpu.getImmediate16()
-		// fmt.Printf("Immediate value 0x%02X at PC: 0x%02X\n", n, cpu.Registers.PC)
+		// cpulogger.Debug(fmt.Sprintf("Immediate value 0x%02X at PC: 0x%02X\n", n, cpu.Registers.PC)
 		cpu.Registers.PC = uint16(n)
 		tCycles = 16
 
@@ -2196,36 +2224,36 @@ func (cpu *CPU) execOpcodes() int {
 
 	case 0b11001001: // 0xC9 -> RET
 		cpu.Registers.PC = cpu.pop()
-		// fmt.Printf("RET-> PC=0x%02X", cpu.Registers.PC)
+		// cpulogger.Debug(fmt.Sprintf("RET-> PC=0x%02X", cpu.Registers.PC)
 		tCycles = 16
 
 	case 0b11001011: // 0xCB -> PREFIX
 		// go to prefixed
 		cbOpcode := cpu.fetchCBOpcode()
-		// // fmt.Printf("Executing CB prefixed opcode: 0x%02X ", cbOpcode)
+		// // cpulogger.Debug(fmt.Sprintf("Executing CB prefixed opcode: 0x%02X ", cbOpcode)
 		switch cbOpcode {
 		case 0b0: // 0x00 -> RLC B
-			cpu.execRLC(cpu.Registers.B)
+			cpu.Registers.B = cpu.execRLC(cpu.Registers.B)
 			tCycles = 8
 
 		case 0b1: // 0x01 -> RLC C
-			cpu.execRLC(cpu.Registers.C)
+			cpu.Registers.C = cpu.execRLC(cpu.Registers.C)
 			tCycles = 8
 
 		case 0b10: // 0x02 -> RLC D
-			cpu.execRLC(cpu.Registers.D)
+			cpu.Registers.D = cpu.execRLC(cpu.Registers.D)
 			tCycles = 8
 
 		case 0b11: // 0x03 -> RLC E
-			cpu.execRLC(cpu.Registers.E)
+			cpu.Registers.E = cpu.execRLC(cpu.Registers.E)
 			tCycles = 8
 
 		case 0b100: // 0x04 -> RLC H
-			cpu.execRLC(cpu.Registers.H)
+			cpu.Registers.H = cpu.execRLC(cpu.Registers.H)
 			tCycles = 8
 
 		case 0b101: // 0x05 -> RLC L
-			cpu.execRLC(cpu.Registers.L)
+			cpu.Registers.L = cpu.execRLC(cpu.Registers.L)
 			tCycles = 8
 
 		case 0b110: // 0x06 -> RLC [HL]
@@ -2233,31 +2261,31 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = 16
 
 		case 0b111: // 0x07 -> RLC A
-			cpu.execRLC(cpu.Registers.A)
+			cpu.Registers.A = cpu.execRLC(cpu.Registers.A)
 			tCycles = 8
 
 		case 0b1000: // 0x08 -> RRC B
-			cpu.execRRC(cpu.Registers.B)
+			cpu.Registers.B = cpu.execRRC(cpu.Registers.B)
 			tCycles = 8
 
 		case 0b1001: // 0x09 -> RRC C
-			cpu.execRRC(cpu.Registers.C)
+			cpu.Registers.C = cpu.execRRC(cpu.Registers.C)
 			tCycles = 8
 
 		case 0b1010: // 0x0A -> RRC D
-			cpu.execRRC(cpu.Registers.D)
+			cpu.Registers.D = cpu.execRRC(cpu.Registers.D)
 			tCycles = 8
 
 		case 0b1011: // 0x0B -> RRC E
-			cpu.execRRC(cpu.Registers.E)
+			cpu.Registers.E = cpu.execRRC(cpu.Registers.E)
 			tCycles = 8
 
 		case 0b1100: // 0x0C -> RRC H
-			cpu.execRRC(cpu.Registers.H)
+			cpu.Registers.H = cpu.execRRC(cpu.Registers.H)
 			tCycles = 8
 
 		case 0b1101: // 0x0D -> RRC L
-			cpu.execRRC(cpu.Registers.L)
+			cpu.Registers.L = cpu.execRRC(cpu.Registers.L)
 			tCycles = 8
 
 		case 0b1110: // 0x0E -> RRC [HL]
@@ -2265,7 +2293,7 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = 16
 
 		case 0b1111: // 0x0F -> RRC A
-			cpu.execRRC(cpu.Registers.A)
+			cpu.Registers.A = cpu.execRRC(cpu.Registers.A)
 			tCycles = 8
 
 		case 0b10000: // 0x10 -> RL B
@@ -2746,7 +2774,7 @@ func (cpu *CPU) execOpcodes() int {
 
 		case 0b10000111: // 0x87 -> RES 0, A
 			cpu.Registers.A = cpu.execRES(cpu.Registers.A, 0)
-			// fmt.Printf("Now executing RES at 0x87")
+			// cpulogger.Debug(fmt.Sprintf("Now executing RES at 0x87")
 			tCycles = 8
 
 		case 0b10001000: // 0x88 -> RES 1, B
@@ -3233,52 +3261,52 @@ func (cpu *CPU) execOpcodes() int {
 			panic("Not an instruction in cb")
 		}
 	case 0b11010011: // 0xD3 -> ILLEGAL_D3
-		// fmt.Println("ILLEGAL_D3")
+		// cpucpulogger.Debug("ILLEGAL_D3")
 		tCycles = 4
 		break
 	case 0b11011001: // 0xD9 -> RETI
 
-		fmt.Println("RETI instruction")
+		cpulogger.Debug("RETI instruction")
 		//Pop two bytes from stack & jump to that address then
 		// enable interrupts.
 		for i := 0; i < 8; i += 2 {
-			// fmt.Printf("Stack[SP+%d]: 0x%02X%02X", i, cpu.Memory[cpu.Registers.SP+uint16(i)+1], cpu.Memory[cpu.Registers.SP+uint16(i)])
+			// cpulogger.Debug(fmt.Sprintf("Stack[SP+%d]: 0x%02X%02X", i, cpu.Memory[cpu.Registers.SP+uint16(i)+1], cpu.Memory[cpu.Registers.SP+uint16(i)])
 		}
-		// fmt.Printf("SP before RETI : 0x%04X", cpu.Registers.SP)
-		// fmt.Printf("Stack[SP]: 0x%02X, Stack[SP+1] : 0x%02X", cpu.Memory[cpu.Registers.SP], cpu.Memory[cpu.Registers.SP+1])
+		// cpulogger.Debug(fmt.Sprintf("SP before RETI : 0x%04X", cpu.Registers.SP)
+		// cpulogger.Debug(fmt.Sprintf("Stack[SP]: 0x%02X, Stack[SP+1] : 0x%02X", cpu.Memory[cpu.Registers.SP], cpu.Memory[cpu.Registers.SP+1])
 
 		cpu.Registers.PC = cpu.pop()
 		cpu.IME = true
-		// fmt.Printf("RETI -> PC: 0x%04X", cpu.Registers.PC)
+		// cpulogger.Debug(fmt.Sprintf("RETI -> PC: 0x%04X", cpu.Registers.PC)
 		tCycles = 16
 
 	case 0b11011011: // 0xDB -> ILLEGAL_DB
-		// fmt.Println("ILLEGAL_DB")
+		// cpucpulogger.Debug("ILLEGAL_DB")
 		tCycles = 4
 		break
 	case 0b11011101: // 0xDD -> ILLEGAL_DD
-		// fmt.Println("ILLEGAL_DD")
+		// cpucpulogger.Debug("ILLEGAL_DD")
 		tCycles = 4
 		break
 	case 0b11100011: // 0xE3 -> ILLEGAL_E3
-		// fmt.Println("ILLEGAL_E3")
+		// cpucpulogger.Debug("ILLEGAL_E3")
 		tCycles = 4
 		break
 	case 0b11100100: // 0xE4 -> ILLEGAL_E4
-		// fmt.Println("ILLEGAL_E4")
+		// cpucpulogger.Debug("ILLEGAL_E4")
 		tCycles = 4
 		break
 	case 0b11101011: // 0xEB -> ILLEGAL_EB
-		// fmt.Println("ILLEGAL_EB")
+		// cpucpulogger.Debug("ILLEGAL_EB")
 		tCycles = 4
 		break
 	case 0b11101100: // 0xEC -> ILLEGAL_EC
 
-		// fmt.Println("ILLEGAL_EC")
+		// cpucpulogger.Debug("ILLEGAL_EC")
 		tCycles = 4
 		break
 	case 0b11101101: // 0xED -> ILLEGAL_ED
-		// fmt.Println("ILLEGAL_ED")
+		// cpucpulogger.Debug("ILLEGAL_ED")
 		tCycles = 4
 		break
 	case 0b11110011: // 0xF3 -> DI
@@ -3286,11 +3314,11 @@ func (cpu *CPU) execOpcodes() int {
 		// This instruction disables interrupts but not
 		// immediately. Interrupts are disabled after
 		// instruction after DI is executed.
-		fmt.Println("DI instruction")
+		cpulogger.Debug("DI instruction")
 		cpu.IME = false
 		tCycles = 4
 	case 0b11110100: // 0xF4 -> ILLEGAL_F4
-		fmt.Println("ILLEGAL_F4")
+		cpulogger.Debug("ILLEGAL_F4")
 		tCycles = 4
 		break
 	case 0b11111011: // 0xFB -> EI
@@ -3298,16 +3326,16 @@ func (cpu *CPU) execOpcodes() int {
 		// Enable interrupts. This intruction enables interrupts
 		// but not immediately. Interrupts are enabled after
 		// instruction after EI is executed.
-		fmt.Println("EI instruction")
-		fmt.Printf("")
+		cpulogger.Debug("EI instruction")
+		cpulogger.Debug(fmt.Sprintf(""))
 		cpu.IMEScheduled = true
 		tCycles = 4
 	case 0b11111100: // 0xFC -> ILLEGAL_FC
-		fmt.Println("ILLEGAL_FC")
+		cpulogger.Debug("ILLEGAL_FC")
 		tCycles = 4
 		break
 	case 0b11111101: // 0xFD -> ILLEGAL_FD
-		fmt.Println("ILLEGAL_FD")
+		cpulogger.Debug("ILLEGAL_FD")
 		tCycles = 4
 		break
 
@@ -3315,7 +3343,7 @@ func (cpu *CPU) execOpcodes() int {
 		panic("Not an operation")
 	}
 	//if cpu.Registers.PC > 0xFFFF {
-	//	// fmt.Println("PC out of bounds")
+	//	// cpucpulogger.Debug("PC out of bounds")
 	//	break
 	//}
 	//cpu.Memory[0xFF40] |= 1 << 7
