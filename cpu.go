@@ -67,9 +67,9 @@ func NewCPU() *CPU {
 
 	cpu.graphics = NewGraphics(cpu)
 
-	cpu.Memory[0xFF40] = 0x91
-	//cpu.Memory[0xFF40] = 0b10010011 // LCDC
-	cpu.Memory[0xFF40] |= 1 << 7 //LCDC enable
+	//cpu.Memory[0xFF40] = 0x91
+	cpu.Memory[0xFF40] = 0b10010001 // LCDC
+	cpu.Memory[0xFF40] |= 1 << 7    //LCDC enable
 
 	cpu.Memory[0xFF41] = 0b00000001 //STAT
 
@@ -756,7 +756,7 @@ func (cpu *CPU) memoryWrite(address uint16, value byte) {
 		cpu.dmaTransfer(value)
 
 	} else if address == 0xFF40 {
-		//// cpulogger.Debug(fmt.Sprintf("!!LCDC WRITE: 0x%02X\n", value)
+		cpulogger.Debug(fmt.Sprintf("!!LCDC WRITE: 0x%02X\n", value))
 		cpu.Memory[address] = value
 	} else {
 		cpu.Memory[address] = value
@@ -1613,6 +1613,7 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = 16
 		} else {
 			tCycles = 12
+			cpulogger.Debug("JP not taken")
 		}
 
 	case 0b11000100: // 0xC4 -> CALL NZ, imm16
@@ -2219,7 +2220,7 @@ func (cpu *CPU) execOpcodes() int {
 
 		// Power down CPU until an interrupt occurs. Use this
 		// when ever possible to reduce energy consumption.
-		//cpu.halted = true
+		cpu.halted = true
 		tCycles = 4
 
 	case 0b11001001: // 0xC9 -> RET
@@ -3328,7 +3329,8 @@ func (cpu *CPU) execOpcodes() int {
 		// instruction after EI is executed.
 		cpulogger.Debug("EI instruction")
 		cpulogger.Debug(fmt.Sprintf(""))
-		cpu.IMEScheduled = true
+		//cpu.IMEScheduled = true
+		cpu.IME = true
 		tCycles = 4
 	case 0b11111100: // 0xFC -> ILLEGAL_FC
 		cpulogger.Debug("ILLEGAL_FC")
@@ -3348,11 +3350,11 @@ func (cpu *CPU) execOpcodes() int {
 	//}
 	//cpu.Memory[0xFF40] |= 1 << 7
 
-	cpu.checkSchedule()
-
 	if cpu.handleInterruptions() {
 		return 0
 	}
+	cpu.checkSchedule()
+
 	return tCycles
 }
 

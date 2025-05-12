@@ -1,11 +1,12 @@
 *.txt
-blargg test
 *.zip
-emu test
-emulicious
 *.pyc
 *.sav
 *.gb
 *.cover
+*.out
 .vscode
 .idea
+blargg test
+emu test
+emulicious
