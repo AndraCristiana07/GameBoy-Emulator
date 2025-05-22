@@ -1,12 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"os"
 )
 
 type Cartridge struct {
-	bootROM         []byte   //responsible for the boot-up animation played before control is handed over to the cartridge’s ROM
+	bootROM         []byte   // responsible for the boot-up animation played before control is handed over to the cartridge’s ROM
 	entryPoint      []byte   // 0100-0103
 	nintendoLogo    []byte   // 0104-0133
 	title           string   // 0134-013E
@@ -20,16 +19,15 @@ type Cartridge struct {
 	destCode        uint8    // 014A
 	oldLicenseeCode uint8    // 014B -> if 33 => new lic
 	maskROMVer      uint8    // 014C
-	checksum        uint8    //014D
-	globalChecksum  [2]uint8 //014E - 014F
-	ROMdata         []byte   //all data
+	checksum        uint8    // 014D
+	globalChecksum  [2]uint8 // 014E - 014F
+	ROMdata         []byte   // all data
 }
 
 func LoadCartridge(filename string) (*Cartridge, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		fmt.Printf("Error reading cartridge file: %s\n", err)
-
+		return nil, err
 	}
 	cartridge := Cartridge{
 		bootROM:         data[0x0000:0x0100],
@@ -68,26 +66,17 @@ func getRAMSize(size uint8) int {
 	}
 	return sizes[size]
 }
+
 func (cartridge *Cartridge) printInfo() {
-	fmt.Printf("Cartridge info:\n")
-	fmt.Printf("Title: %s\n", cartridge.title)
-	fmt.Printf("CCB Flag: %d\n", cartridge.CCBFlag)
-	fmt.Printf("Cartridge type: %d\n", cartridge.cartridgeType)
-	fmt.Printf("ROM Size: %d KB\n", getROMSize(cartridge.RAMSize)/1024)
-	fmt.Printf("RAM size: %d KB\n", getRAMSize(cartridge.RAMSize)/1024)
-	fmt.Printf("Destination code: 0x%d\n", cartridge.destCode)
-	fmt.Printf("New licensee code: 0x%d\n", cartridge.newLicenseeCode)
-	fmt.Printf("SGB Flag: %d\n", cartridge.SGBFlag)
-	fmt.Printf("Checksum: 0x%d\n", cartridge.checksum)
-	fmt.Printf("Global Checksum: 0x%d\n", cartridge.globalChecksum)
+	// fmt.Printf("Cartridge info:\n")
+	// fmt.Printf("Title: %s\n", cartridge.title)
+	// fmt.Printf("CCB Flag: %d\n", cartridge.CCBFlag)
+	// fmt.Printf("Cartridge type: %d\n", cartridge.cartridgeType)
+	// fmt.Printf("ROM Size: %d KB\n", getROMSize(cartridge.RAMSize)/1024)
+	// fmt.Printf("RAM size: %d KB\n", getRAMSize(cartridge.RAMSize)/1024)
+	// fmt.Printf("Destination code: 0x%d\n", cartridge.destCode)
+	// fmt.Printf("New licensee code: 0x%d\n", cartridge.newLicenseeCode)
+	// fmt.Printf("SGB Flag: %d\n", cartridge.SGBFlag)
+	// fmt.Printf("Checksum: 0x%d\n", cartridge.checksum)
+	// fmt.Printf("Global Checksum: 0x%d\n", cartridge.globalChecksum)
 }
-
-//func main() {
-//	cartridge, err := loadCartridge("roms/The Legend of Zelda - Links Awakening (US - EU).gb")
-//	if err != nil {
-//		fmt.Printf("Error loading cartridge: %s\n", err)
-//		return
-//	}
-//	cartridge.printInfo()
-
-//}
