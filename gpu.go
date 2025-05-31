@@ -318,14 +318,14 @@ func (graphic *Graphics) getBackground() [height][width]uint8 {
 	scy := int(graphic.getSCY())
 	//ly := int(graphic.getLY())
 	lcdc := graphic.getLCDC()
-	gpulogger.Debug(fmt.Sprintf("lcdc 0b%08b", lcdc))
+	// gpulogger.Debug(fmt.Sprintf("lcdc 0b%08b", lcdc))
 
 	bgTileMapBase := uint16(0x9800)
 	if (lcdc & (1 << 3)) != 0 {
 		bgTileMapBase = 0x9C00
 	}
 
-	gpulogger.Debug(fmt.Sprintf("BG TileMapBase: 0x%04X\n", bgTileMapBase))
+	// gpulogger.Debug(fmt.Sprintf("BG TileMapBase: 0x%04X\n", bgTileMapBase))
 	for ly := 0; ly < height; ly++ {
 
 		for screenX := 0; screenX < width; screenX++ {
@@ -347,7 +347,7 @@ func (graphic *Graphics) getBackground() [height][width]uint8 {
 
 				tileAddress = 0x9000 + int(int8(tileIndex))*16
 			}
-			gpulogger.Debug(fmt.Sprintf(" tileAddress: 0x%04X", tileAddress))
+			// gpulogger.Debug(fmt.Sprintf(" tileAddress: 0x%04X", tileAddress))
 
 			tilePixelX := bgX % 8
 			tilePixelY := bgY % 8
@@ -476,7 +476,7 @@ func (graphic *Graphics) drawScreen() {
 
 func (graphic *Graphics) modesHandling(tCycles int) {
 	// gpulogger.Debug("mode handling")
-	gpulogger.Debug(fmt.Sprintf("LCDC: 0b%08b\n", graphic.getLCDC()))
+	// gpulogger.Debug(fmt.Sprintf("LCDC: 0b%08b\n", graphic.getLCDC()))
 	if graphic.cpu == nil {
 		// gpulogger.Debug("Error: graphics.cpu is nil")
 		return
@@ -494,7 +494,7 @@ func (graphic *Graphics) modesHandling(tCycles int) {
 	graphic.cycle += tCycles
 
 	if int(ly) >= SCANLINES_PER_FRAME {
-		gpulogger.Debug("Entering VBLANK")
+		// gpulogger.Debug("Entering VBLANK")
 		graphic.setMode(MODE_VBLANK)
 		if ly == SCANLINES_PER_FRAME {
 			// gpulogger.Debug("Entering Vblank")
@@ -504,17 +504,17 @@ func (graphic *Graphics) modesHandling(tCycles int) {
 	} else {
 		//if graphic.cycle >= 456-80 {
 		if graphic.cycle < 80 {
-			if graphic.cpu.Memory[0xFF41] != MODE_OAMSCAN {
-				gpulogger.Debug("Entering OAMSCAN")
-			}
+			// if graphic.cpu.Memory[0xFF41] != MODE_OAMSCAN {
+			// 	gpulogger.Debug("Entering OAMSCAN")
+			// }
 			//gpulogger.Debug("Entering OAMSCAN")
 			graphic.setMode(MODE_OAMSCAN)
 
 			//} else if graphic.cycle >= 456-80-172 {
 		} else if graphic.cycle < 80+172 {
-			if graphic.cpu.Memory[0xFF41] != MODE_DRAWING {
-				gpulogger.Debug("Entering drawing mode")
-			}
+			// if graphic.cpu.Memory[0xFF41] != MODE_DRAWING {
+			// gpulogger.Debug("Entering drawing mode")
+			// }
 			//gpulogger.Debug("Entering Drawing")
 			graphic.setMode(MODE_DRAWING)
 
@@ -524,9 +524,9 @@ func (graphic *Graphics) modesHandling(tCycles int) {
 				graphic.drawnLine = true
 			}
 		} else {
-			if graphic.cpu.Memory[0xFF41] != MODE_HBLANK {
-				gpulogger.Debug("Entering Hblank")
-			}
+			// if graphic.cpu.Memory[0xFF41] != MODE_HBLANK {
+			// 	gpulogger.Debug("Entering Hblank")
+			// }
 			//gpulogger.Debug("Entering HBLANK")
 			graphic.setMode(MODE_HBLANK)
 
@@ -537,7 +537,7 @@ func (graphic *Graphics) modesHandling(tCycles int) {
 		graphic.cycle -= CYCLES_PER_LINE
 		graphic.drawnLine = false
 
-		gpulogger.Debug(fmt.Sprintf("ly inc to : %d", graphic.getLY()+1))
+		// gpulogger.Debug(fmt.Sprintf("ly inc to : %d", graphic.getLY()+1))
 		graphic.cpu.Memory[0xFF44]++
 
 		if graphic.getLY() >= TOTAL_LINES-1 {

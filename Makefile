@@ -1,9 +1,9 @@
 
 run:
-	LOGXI=* go run main.go gpu.go cpu.go parseRom.go timer.go
+	LOGXI=* go run main.go gpu.go cpu.go parseRom.go timer.go cpu_common.go cpu_ops.go
 
 release:
-	go run main.go gpu.go cpu.go parseRom.go timer.go
+	go run main.go gpu.go cpu.go parseRom.go timer.go cpu_common.go cpu_ops.go
 
 
 unittest:

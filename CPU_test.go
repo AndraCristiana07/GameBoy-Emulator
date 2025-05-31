@@ -4278,7 +4278,6 @@ func TestDI(t *testing.T) {
 	}
 }
 
-// TODO: EI
 func TestEI(t *testing.T) {
 	cpu := NewCPU()
 
