@@ -18,10 +18,12 @@ type CPU struct {
 	timer     Timer
 	Cartridge *Cartridge
 	graphics  *Graphics
+	joypad    *Joypad
 	//OpcodesTable map[string]map[string][]map[string]string
 	IME          bool // interrupt master enable
 	IMEScheduled bool //enable IME after one instr
 	halted       bool
+	haltBug      bool
 	stopped      bool
 	IE           uint8 // FFFF — IE: Interrupt enable
 	IF           uint8 //FF0F — IF: Interrupt flag
@@ -44,7 +46,9 @@ const flagC uint8 = 1 << 4 // carry flag
 func NewCPU() *CPU {
 	cpulogger = log.New("cpu")
 
-	cpu := &CPU{}
+	cpu := &CPU{
+		joypad: &Joypad{},
+	}
 	cpu.IME = false
 
 	//cpu.graphics.cpu = cpu
@@ -126,7 +130,11 @@ func (cpu *CPU) checkSchedule() {
 func (cpu *CPU) fetchOpcode() uint8 {
 	//opcode := cpu.Memory[cpu.Registers.PC]
 	opcode := cpu.memoryRead(cpu.Registers.PC)
-	cpu.Registers.PC++
+	if cpu.haltBug {
+		cpu.haltBug = false // PC not incremented
+	} else {
+		cpu.Registers.PC++
+	}
 	return opcode
 }
 
@@ -215,8 +223,9 @@ func (cpu *CPU) memoryWrite(address uint16, value byte) {
 		//  https://gbdev.gg8.se/forums/viewtopic.php?id=845
 		//  https://gbdev.io/pandocs/Joypad_Input.html#ff00--p1joyp-joypad
 		//TODO: write just to bits 5,4 for joypad - p1
-		current := cpu.Memory[address]
-		cpu.Memory[address] = current&0b11001111 | value&0b00110000
+		//current := cpu.Memory[address]
+		//cpu.Memory[address] = current&0b11001111 | value&0b00110000
+		cpu.joypad.write(value)
 		cpulogger.Debug(fmt.Sprintf("write in 0xFF00 %08b", cpu.Memory[address]))
 	} else if address == 0xFF89 {
 		cpulogger.Debug(fmt.Sprintf("write in 0xFF89 %08b", value))
@@ -236,6 +245,9 @@ func (cpu *CPU) memoryWrite(address uint16, value byte) {
 		//cpu.graphics.writeVRAM(address, value)
 		cpu.Memory[address] = value
 	} else if address >= OAM_START && address <= OAM_END {
+		if address == 0xFF78 {
+			logger.Debug(fmt.Sprintf("write in 0xFF78 %08b", value))
+		}
 		cpu.Memory[address] = value
 	} else if address == 0xFF46 {
 		cpu.Memory[address] = value
@@ -248,11 +260,15 @@ func (cpu *CPU) memoryWrite(address uint16, value byte) {
 	}
 }
 func (cpu *CPU) memoryRead(address uint16) byte {
+	if address == 0xFF00 {
+		return cpu.joypad.read()
+	}
 	return cpu.Memory[address]
 }
 func (cpu *CPU) execOpcodes() int {
 	if cpu.halted {
-		return 0
+		cpu.handleInterruptions()
+		//return 0
 	}
 	if cpu.stopped {
 		return 0
@@ -290,6 +306,293 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = cpu.cbop58()
 		case 0x7e:
 			tCycles = cpu.cbop7e()
+		case 0x6f:
+			tCycles = cpu.cbop6f()
+		case 0x28:
+			tCycles = cpu.cbop28()
+		case 0x29:
+			tCycles = cpu.cbop29()
+
+		// ----done tetris----
+		// ----start tennis---
+		case 0xbf:
+			tCycles = cpu.cbopbf()
+		case 0x3f:
+			tCycles = cpu.cbop3f()
+		case 0xbe:
+			tCycles = cpu.cbopbe()
+		case 0xc7:
+			tCycles = cpu.cbopc7()
+		case 0xff:
+			tCycles = cpu.cbopff()
+		case 0x12:
+			tCycles = cpu.cbop12()
+		//////////////////
+		case 0x00:
+			tCycles = cpu.cbop00()
+			////// joypad
+		case 0x40:
+			tCycles = cpu.cbop40()
+		case 0xa9:
+			tCycles = cpu.cbopa9()
+		case 0x13:
+			tCycles = cpu.cbop13()
+		case 0x33:
+			tCycles = cpu.cbop33()
+		////
+		case 0x57:
+			tCycles = cpu.cbop57()
+		case 0x5f:
+			tCycles = cpu.cbop5f()
+		case 0x70:
+			tCycles = cpu.cbop70()
+		case 0x78:
+			tCycles = cpu.cbop78()
+		case 0x47:
+			tCycles = cpu.cbop47()
+		case 0x4f:
+			tCycles = cpu.cbop4f()
+		case 0x77:
+			tCycles = cpu.cbop77()
+		case 0x48:
+			tCycles = cpu.cbop48()
+		case 0x41:
+			tCycles = cpu.cbop41()
+		case 0xb0:
+			tCycles = cpu.cbopb0()
+		case 0xfe:
+			tCycles = cpu.cbopfe()
+		case 0x23:
+			tCycles = cpu.cbop23()
+		case 0x11:
+			tCycles = cpu.cbop11()
+		case 0x3d:
+			tCycles = cpu.cbop3d()
+		case 0xc9:
+			tCycles = cpu.cbopc9()
+		case 0xd1:
+			tCycles = cpu.cbopd1()
+		case 0x69:
+			tCycles = cpu.cbop69()
+		case 0x61:
+			tCycles = cpu.cbop61()
+		case 0x71:
+			tCycles = cpu.cbop71()
+		case 0x79:
+			tCycles = cpu.cbop79()
+		case 0x10:
+			tCycles = cpu.cbop10()
+		case 0x21:
+			tCycles = cpu.cbop21()
+		case 0x17:
+			tCycles = cpu.cbop17()
+		case 0x39:
+			tCycles = cpu.cbop39()
+		case 0x1c:
+			tCycles = cpu.cbop1c()
+		case 0x1d:
+			tCycles = cpu.cbop1d()
+		case 0xb6:
+			tCycles = cpu.cbopb6()
+		case 0x2f:
+			tCycles = cpu.cbop2f()
+		case 0xd9:
+			tCycles = cpu.cbopd9()
+		case 0xc1:
+			tCycles = cpu.cbopc1()
+		case 0x38:
+			tCycles = cpu.cbop38()
+		case 0x67:
+			tCycles = cpu.cbop67()
+		case 0xee:
+			tCycles = cpu.cbopee()
+		case 0x81:
+			tCycles = cpu.cbop81()
+		case 0x89:
+			tCycles = cpu.cbop89()
+		case 0x5e:
+			tCycles = cpu.cbop5e()
+		case 0xde:
+			tCycles = cpu.cbopde()
+		case 0xef:
+			tCycles = cpu.cbopef()
+		case 0x46:
+			tCycles = cpu.cbop46()
+		case 0x01:
+			tCycles = cpu.cbop01()
+		case 0x02:
+			tCycles = cpu.cbop02()
+		case 0x03:
+			tCycles = cpu.cbop03()
+		case 0x04:
+			tCycles = cpu.cbop04()
+		case 0x05:
+			tCycles = cpu.cbop05()
+		case 0x06:
+			tCycles = cpu.cbop06()
+		case 0x07:
+			tCycles = cpu.cbop07()
+		case 0x08:
+			tCycles = cpu.cbop08()
+		case 0x09:
+			tCycles = cpu.cbop09()
+		case 0x0a:
+			tCycles = cpu.cbop0a()
+		case 0x0b:
+			tCycles = cpu.cbop0b()
+		case 0x0c:
+			tCycles = cpu.cbop0c()
+		case 0x0d:
+			tCycles = cpu.cbop0d()
+		case 0x0e:
+			tCycles = cpu.cbop0e()
+		case 0x0f:
+			tCycles = cpu.cbop0f()
+		case 0x18:
+			tCycles = cpu.cbop18()
+		case 0x19:
+			tCycles = cpu.cbop19()
+		case 0x1a:
+			tCycles = cpu.cbop1a()
+		case 0x1b:
+			tCycles = cpu.cbop1b()
+		case 0x1e:
+			tCycles = cpu.cbop1e()
+		case 0x1f:
+			tCycles = cpu.cbop1f()
+		case 0x3a:
+			tCycles = cpu.cbop3a()
+		case 0x3b:
+			tCycles = cpu.cbop3b()
+		case 0x3c:
+			tCycles = cpu.cbop3c()
+
+		case 0x3e:
+			tCycles = cpu.cbop3e()
+		case 0x2a:
+			tCycles = cpu.cbop2a()
+		case 0x2b:
+			tCycles = cpu.cbop2b()
+		case 0x2c:
+			tCycles = cpu.cbop2c()
+		case 0x2d:
+			tCycles = cpu.cbop2d()
+		case 0x2e:
+			tCycles = cpu.cbop2e()
+		case 0x20:
+			tCycles = cpu.cbop20()
+		case 0x22:
+			tCycles = cpu.cbop22()
+		case 0x24:
+			tCycles = cpu.cbop24()
+		case 0x25:
+			tCycles = cpu.cbop25()
+		case 0x26:
+			tCycles = cpu.cbop26()
+		case 0x30:
+			tCycles = cpu.cbop30()
+		case 0x31:
+			tCycles = cpu.cbop31()
+		case 0x32:
+			tCycles = cpu.cbop32()
+		case 0x34:
+			tCycles = cpu.cbop34()
+		case 0x35:
+			tCycles = cpu.cbop35()
+		case 0x36:
+			tCycles = cpu.cbop36()
+		case 0x80:
+			tCycles = cpu.cbop80()
+		case 0x82:
+			tCycles = cpu.cbop82()
+		case 0x83:
+			tCycles = cpu.cbop83()
+		case 0x84:
+			tCycles = cpu.cbop84()
+		case 0x85:
+			tCycles = cpu.cbop85()
+		case 0x88:
+			tCycles = cpu.cbop88()
+		case 0x8a:
+			tCycles = cpu.cbop8a()
+		case 0x8b:
+			tCycles = cpu.cbop8b()
+		case 0x8c:
+			tCycles = cpu.cbop8c()
+		case 0x8d:
+			tCycles = cpu.cbop8d()
+		case 0x8e:
+			tCycles = cpu.cbop8e()
+		case 0x8f:
+			tCycles = cpu.cbop8f()
+		case 0x90:
+			tCycles = cpu.cbop90()
+		case 0x91:
+			tCycles = cpu.cbop91()
+		case 0x92:
+			tCycles = cpu.cbop92()
+		case 0x93:
+			tCycles = cpu.cbop93()
+		case 0x94:
+			tCycles = cpu.cbop94()
+		case 0x95:
+			tCycles = cpu.cbop95()
+		case 0x96:
+			tCycles = cpu.cbop96()
+		case 0x97:
+			tCycles = cpu.cbop97()
+		case 0x98:
+			tCycles = cpu.cbop98()
+		case 0x99:
+			tCycles = cpu.cbop99()
+		case 0x9a:
+			tCycles = cpu.cbop9a()
+		case 0x9b:
+			tCycles = cpu.cbop9b()
+		case 0x9c:
+			tCycles = cpu.cbop9c()
+		case 0x9d:
+			tCycles = cpu.cbop9d()
+		case 0x9e:
+			tCycles = cpu.cbop9e()
+		case 0x9f:
+			tCycles = cpu.cbop9f()
+		case 0xa0:
+			tCycles = cpu.cbopa0()
+		case 0xa1:
+			tCycles = cpu.cbopa1()
+		case 0xa2:
+			tCycles = cpu.cbopa2()
+		case 0xa3:
+			tCycles = cpu.cbopa3()
+		case 0xa4:
+			tCycles = cpu.cbopa4()
+		case 0xa5:
+			tCycles = cpu.cbopa5()
+		case 0xa6:
+			tCycles = cpu.cbopa6()
+		case 0xa7:
+			tCycles = cpu.cbopa7()
+		case 0xa8:
+			tCycles = cpu.cbopa8()
+		case 0xaa:
+			tCycles = cpu.cbopaa()
+		case 0xab:
+			tCycles = cpu.cbopab()
+		case 0xac:
+			tCycles = cpu.cbopac()
+		case 0xad:
+			tCycles = cpu.cbopad()
+		case 0xae:
+			tCycles = cpu.cbopae()
+		case 0xaf:
+			tCycles = cpu.cbopaf()
+		case 0x14:
+			tCycles = cpu.cbop14()
+		case 0x15:
+			tCycles = cpu.cbop15()
+		case 0x16:
+			tCycles = cpu.cbop16()
 
 		default:
 			panic(cpulogger.Error(fmt.Sprintf("[CB] Opcode 0x%x is not implemented. PC=0x%x", opcode, cpu.Registers.PC-1)))
@@ -333,8 +636,6 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = cpu.opea()
 		case 0x31:
 			tCycles = cpu.op31()
-		////case 0xff:
-		////	tCycles = cpu.opff()
 		case 0x2a:
 			tCycles = cpu.op2a()
 		case 0xe2:
@@ -515,6 +816,201 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = cpu.op62()
 		case 0x40:
 			tCycles = cpu.op40()
+		// ----done tetris----
+		// ----start tennis---
+		case 0x26:
+			tCycles = cpu.op26()
+		case 0x95:
+			tCycles = cpu.op95()
+		case 0xcf:
+			tCycles = cpu.opcf()
+		case 0x66:
+			tCycles = cpu.op66()
+		case 0x81:
+			tCycles = cpu.op81()
+		case 0x29:
+			tCycles = cpu.op29()
+		case 0x76:
+			tCycles = cpu.op76()
+		case 0x80:
+			tCycles = cpu.op80()
+		/////
+		case 0x04:
+			tCycles = cpu.op04()
+		case 0x0f:
+			tCycles = cpu.op0f()
+		case 0xb2:
+			tCycles = cpu.opb2()
+		case 0xd2:
+			tCycles = cpu.opd2()
+		case 0xb3:
+			tCycles = cpu.opb3()
+		case 0xa0:
+			tCycles = cpu.opa0()
+		case 0x2e:
+			tCycles = cpu.op2e()
+		case 0xce:
+			tCycles = cpu.opce()
+		case 0xb8:
+			tCycles = cpu.opb8()
+		case 0x38:
+			tCycles = cpu.op38()
+		case 0xcc:
+			tCycles = cpu.opcc()
+		case 0xee:
+			tCycles = cpu.opee()
+		case 0xdf:
+			tCycles = cpu.opdf()
+		case 0xd6:
+			tCycles = cpu.opd6()
+		case 0x14:
+			tCycles = cpu.op14()
+		case 0x83:
+			tCycles = cpu.op83()
+		case 0xd8:
+			tCycles = cpu.opd8()
+		case 0xbe:
+			tCycles = cpu.opbe()
+		case 0x91:
+			tCycles = cpu.op91()
+		case 0x90:
+			tCycles = cpu.op90()
+		case 0xd0:
+			tCycles = cpu.opd0()
+		case 0x89:
+			tCycles = cpu.op89()
+		case 0x6c:
+			tCycles = cpu.op6c()
+		case 0x61:
+			tCycles = cpu.op61()
+		case 0x17:
+			tCycles = cpu.op17()
+		case 0xb9:
+			tCycles = cpu.opb9()
+		case 0x93:
+			tCycles = cpu.op93()
+		case 0xae:
+			tCycles = cpu.opae()
+		case 0x9a:
+			tCycles = cpu.op9a()
+		case 0x25:
+			tCycles = cpu.op25()
+		case 0x96:
+			tCycles = cpu.op96()
+		case 0x9e:
+			tCycles = cpu.op9e()
+		case 0x8c:
+			tCycles = cpu.op8c()
+		case 0xde:
+			tCycles = cpu.opde()
+		case 0x99:
+			tCycles = cpu.op99()
+		case 0x98:
+			tCycles = cpu.op98()
+		case 0x86:
+			tCycles = cpu.op86()
+		case 0x8e:
+			tCycles = cpu.op8e()
+		case 0x9c:
+			tCycles = cpu.op9c()
+		case 0x24:
+			tCycles = cpu.op24()
+		case 0xbd:
+			tCycles = cpu.opbd()
+		case 0x3f:
+			tCycles = cpu.op3f()
+		case 0x51:
+			tCycles = cpu.op51()
+		case 0x1b:
+			tCycles = cpu.op1b()
+			//////// joypad
+		case 0xc4:
+			tCycles = cpu.opc4()
+		case 0xdc:
+			tCycles = cpu.opdc()
+		case 0xfc:
+			tCycles = cpu.opfc()
+		case 0xff:
+			tCycles = cpu.opff()
+		//////////////
+		case 0x33:
+			tCycles = cpu.op33()
+		case 0x15:
+			tCycles = cpu.op15()
+		case 0x1d:
+			tCycles = cpu.op1d()
+		case 0x2b:
+			tCycles = cpu.op2b()
+		case 0x3b:
+			tCycles = cpu.op3b()
+		case 0x39:
+			tCycles = cpu.op39()
+		case 0x82:
+			tCycles = cpu.op82()
+		case 0x84:
+			tCycles = cpu.op84()
+		case 0xe8:
+			tCycles = cpu.ope8()
+		case 0x92:
+			tCycles = cpu.op92()
+		case 0x94:
+			tCycles = cpu.op94()
+		case 0x97:
+			tCycles = cpu.op97()
+		case 0xa2:
+			tCycles = cpu.opa2()
+		case 0xa3:
+			tCycles = cpu.opa3()
+		case 0xa4:
+			tCycles = cpu.opa4()
+		case 0xa5:
+			tCycles = cpu.opa5()
+		case 0xa6:
+			tCycles = cpu.opa6()
+		case 0xb4:
+			tCycles = cpu.opb4()
+		case 0xb5:
+			tCycles = cpu.opb5()
+		case 0xb6:
+			tCycles = cpu.opb6()
+		case 0xb7:
+			tCycles = cpu.opb7()
+		case 0xa8:
+			tCycles = cpu.opa8()
+		case 0xaa:
+			tCycles = cpu.opaa()
+		case 0xab:
+			tCycles = cpu.opab()
+		case 0xac:
+			tCycles = cpu.opac()
+		case 0xad:
+			tCycles = cpu.opad()
+		case 0x88:
+			tCycles = cpu.op88()
+		case 0x8a:
+			tCycles = cpu.op8a()
+		case 0x8b:
+			tCycles = cpu.op8b()
+		case 0x8d:
+			tCycles = cpu.op8d()
+		case 0x8f:
+			tCycles = cpu.op8f()
+		case 0x9d:
+			tCycles = cpu.op9d()
+		case 0x9f:
+			tCycles = cpu.op9f()
+		case 0xba:
+			tCycles = cpu.opba()
+		case 0xbb:
+			tCycles = cpu.opbb()
+		case 0xbc:
+			tCycles = cpu.opbc()
+		case 0xbf:
+			tCycles = cpu.opbf()
+		case 0x10:
+			tCycles = cpu.op10()
+		case 0xd4:
+			tCycles = cpu.opd4()
 
 		default:
 			panic(cpulogger.Error(fmt.Sprintf("Opcode 0x%x is not implemented. PC=0x%x", opcode, cpu.Registers.PC-1)))
@@ -602,11 +1098,15 @@ func (cpu *CPU) frameSteps() {
 	const cyclesPerFrame = 70224
 	cyclesCurrFrame := 0
 	for cyclesCurrFrame < cyclesPerFrame {
+
 		tCycles := cpu.execOpcodes()
+		cpu.graphics.modesHandling(tCycles)
+
 		cpu.handleInterruptions()
 		cpu.checkSchedule()
 		cpu.timer.Update(tCycles, cpu)
-		cpu.graphics.modesHandling(tCycles)
+		cpu.joypad.UpdateJoypad()
 		cyclesCurrFrame += tCycles
 	}
+
 }

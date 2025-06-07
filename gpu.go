@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
-	"sort"
-
 	rl "github.com/gen2brain/raylib-go/raylib"
 	log "github.com/mgutz/logxi/v1"
+	"sort"
 )
 
 var gpulogger log.Logger
@@ -113,8 +112,13 @@ func (cpu *CPU) dmaTransfer(value uint8) {
 		gpulogger.Debug(fmt.Sprintf("upper with i is 0x%02X", upper+uint16(i)))
 
 		gpulogger.Debug(fmt.Sprintf("OAM at 0x%02X will be: 0x%02X", OAM_START+uint16(i), cpu.Memory[upper+uint16(i)]))
+		if OAM_START+uint16(i) == 0xFF78 {
+			logger.Debug(fmt.Sprintf("write in 0xFF78 %08b", value))
+
+		}
 		cpu.Memory[OAM_START+uint16(i)] = cpu.Memory[upper+uint16(i)]
-		gpulogger.Debug(fmt.Sprintf("DMA Transfer ->  %04X - %02X\n ", i, cpu.Memory[i]))
+		gpulogger.Debug(fmt.Sprintf("DMA Transfer ->  %04X - %02X %04X- with DE=%04X  %04X, with upper+i %04X and in memory %04X\n ", i, cpu.Memory[i], value, cpu.Registers.getDE(), cpu.Memory[value], upper+uint16(i), cpu.Memory[upper+uint16(i)]))
+
 	}
 	gpulogger.Debug("done")
 }
@@ -162,14 +166,12 @@ func (graphic *Graphics) getTilePixel(address uint16, x int, y int) uint8 {
 func (graphic *Graphics) spritesOAM() [height][width]uint8 {
 
 	var spritePixels [height][width]uint8
-
+	//var spritePriority [height][width]bool
 	for y := range spritePixels {
 		for x := range spritePixels[y] {
 			spritePixels[y][x] = 255
 		}
 	}
-	//obp0 := graphic.cpu.Memory[0xFF48]
-	//obp1 := graphic.cpu.Memory[0xFF49]
 	spriteSize := 8
 
 	// In 8x16 sprite mode, the least significant bit of the
@@ -181,6 +183,7 @@ func (graphic *Graphics) spritesOAM() [height][width]uint8 {
 
 	// 10 sprites visible at a time
 	var visibleSprites []Sprite
+	ly := graphic.getLY()
 
 	// display up to 40 movable objects (or sprites)
 	for i := 0; i < 40; i++ {
@@ -201,22 +204,22 @@ func (graphic *Graphics) spritesOAM() [height][width]uint8 {
 		tileIndex := graphic.cpu.memoryRead(uint16(spriteAddr + 2))
 
 		if spriteSize == 16 {
-			tileIndex &= 0xFE // mask bit 0
+			tileIndex &= 0b11111110 // mask bit 0
 		}
 
 		//Byte 3 — Attributes/Flags
 		attributes := graphic.cpu.memoryRead(uint16(spriteAddr + 3))
 
 		//check if sprite is onscanline
-		if int(graphic.getLY()) < y || int(graphic.getLY()) >= y+spriteSize {
+		if int(ly) < y || int(ly) >= y+spriteSize {
 			continue
 		}
 
 		visibleSprites = append(visibleSprites, Sprite{x, y, tileIndex, attributes, i})
 	}
 
-	// order by X (smaller X->bigger prority)
-	// if x the same => by OAM location order
+	//// order by X (smaller X->bigger prority)
+	//// if x the same => by OAM location order
 	sort.Slice(visibleSprites, func(i, j int) bool {
 		if visibleSprites[i].x == visibleSprites[j].x {
 			return visibleSprites[i].OAMOrder < visibleSprites[j].OAMOrder
@@ -230,50 +233,45 @@ func (graphic *Graphics) spritesOAM() [height][width]uint8 {
 	}
 
 	bgPixels := graphic.getBackground()
-	ly := graphic.getLY()
 	for _, sprite := range visibleSprites {
 
-		//					7			6	  5			 4		     3		 2	1	0
-		//Attributes	Priority	Y flip	X flip	 DMG palette 	Bank	CGB palette
+		////					7			6	  5			 4		     3		 2	1	0
+		////Attributes	Priority	Y flip	X flip	 DMG palette 	Bank	CGB palette
 		yFlip := sprite.attributes & (1 << 6)
 		xFlip := sprite.attributes & (1 << 5)
-
+		//
 		priority := sprite.attributes & (1 << 7)
 
-		//DMGPallete := sprite.attributes & (1 << 4)
-
-		//palette := obp0
-		//if DMGPallete != 0 {
-		//	palette = obp1
-		//}
-
 		tileY := int(ly) - sprite.y
+		base := int(sprite.tileIndex)
+		if spriteSize == 16 && tileY >= 8 {
+			base += 1
+			tileY -= 8
+		}
+		tileAddress := 0x8000 + (base * 16)
+
 		if yFlip != 0 {
 			tileY = spriteSize - 1 - tileY
-
 		}
+		tileData := graphic.cpu.readTileData(uint16(tileAddress))
+
 		if tileY < 0 || tileY >= 8 {
 			continue
 		}
-		tileAddress := 0x8000 + (int(sprite.tileIndex) * 16)
 		if tileAddress < VRAM_START || tileAddress > 0x97FF {
 			gpulogger.Debug(fmt.Sprintf("tileAddress %04X is invalid\n", tileAddress))
 			continue
 		}
-		tileData := graphic.cpu.readTileData(uint16(tileAddress))
 
 		for col := 0; col < 8; col++ {
 			tileX := col
 			if xFlip != 0 {
 				tileX = 7 - col
 			}
-			if tileX < 0 || tileX >= 8 {
-				continue
-			}
+
 			pixelValue := tileData[tileY][tileX]
 
 			if pixelValue == 0 {
-				// gpulogger.Debug(fmt.Sprintf("skip transparent")
 				continue // transparent
 			}
 			screenX := sprite.x + col
@@ -281,29 +279,29 @@ func (graphic *Graphics) spritesOAM() [height][width]uint8 {
 
 			// check bounds
 			if screenX < 0 || screenY < 0 || screenX >= width || screenY >= height {
-				// gpulogger.Debug(fmt.Sprintf("skip pixel out of bounds (x:%d, y:%d)\n", screenX, screenY)
 				continue
 			}
 
 			bgPixelValue := bgPixels[screenY][screenX]
 			if priority != 0 && bgPixelValue != 0 {
-				// gpulogger.Debug(fmt.Sprintf("skip pixel -> priority bgPixelValue: %02X\n", bgPixelValue)
 				continue
 			}
-
-			if spritePixels[ly][screenX] == 255 {
-				// gpulogger.Debug(fmt.Sprintf("Drawing sprite pixel at ScreenX=%d ScreenY=%d, value=%d\n", screenX, screenY, pixelValue)
-				//shade := (palette >> (pixelValue * 2)) & 0x03
-				//// gpulogger.Debug("Sprite Palette", palette, "shade", shade)
-
-				//spritePixels[graphic.getLY()][screenX] = shade
-				spritePixels[ly][screenX] = pixelValue
-
-			} else {
-				gpulogger.Debug("Skip pixel. Pixel already occupied")
-			}
+			spritePixels[ly][screenX] = pixelValue
 
 		}
+
+		//debug
+		//{
+		//	for i := 0; i < 8; i++ {
+		//		for j := 0; j < 8; j++ {
+		//			if sprite.x+j >= 160 || sprite.y+i >= 144 || sprite.x+j < 0 || sprite.y+i < 0 {
+		//				continue
+		//			}
+		//			spritePixels[sprite.y+i][sprite.x+j] = 3
+		//		}
+		//	}
+		//
+		//}
 
 	}
 
@@ -443,7 +441,6 @@ func (graphic *Graphics) renderScanline() {
 		// window overrides background
 		if lcdc&(1<<5) != 0 && winPixels[ly][screenX] != 0 {
 			pixel = winPixels[ly][screenX]
-
 		}
 
 		//sprites override, unless transparent
@@ -452,7 +449,9 @@ func (graphic *Graphics) renderScanline() {
 		}
 		if lcdc&(1<<1) != 0 {
 			spritePixel := spritePixels[ly][screenX]
+			//spritePrio := spritePriority[ly][screenX]
 			if spritePixel != 255 && spritePixel != 0 {
+				//if !spritePrio || pixel == 0{}
 				pixel = spritePixel
 			}
 		}
@@ -460,6 +459,12 @@ func (graphic *Graphics) renderScanline() {
 		graphic.pixelBuffer[ly][screenX] = pixel
 		// gpulogger.Debug(fmt.Sprintf("pixel: %d, color of pixel: %d\n", pixel, color)
 
+		x := screenX
+		y := int(ly)
+		colorIdx := graphic.pixelBuffer[y][x]
+		color := colors[colorIdx]
+		scale := 2
+		rl.DrawRectangle(int32(x*scale), int32(y*scale), int32(scale), int32(scale), color)
 	}
 }
 
@@ -494,43 +499,29 @@ func (graphic *Graphics) modesHandling(tCycles int) {
 	graphic.cycle += tCycles
 
 	if int(ly) >= SCANLINES_PER_FRAME {
-		// gpulogger.Debug("Entering VBLANK")
 		graphic.setMode(MODE_VBLANK)
 		if ly == SCANLINES_PER_FRAME {
-			// gpulogger.Debug("Entering Vblank")
 			IF := graphic.cpu.Memory[0xFF0F] | 1<<0
 			graphic.cpu.memoryWrite(0xFF0F, IF)
 		}
 	} else {
 		//if graphic.cycle >= 456-80 {
-		if graphic.cycle < 80 {
-			// if graphic.cpu.Memory[0xFF41] != MODE_OAMSCAN {
-			// 	gpulogger.Debug("Entering OAMSCAN")
-			// }
-			//gpulogger.Debug("Entering OAMSCAN")
-			graphic.setMode(MODE_OAMSCAN)
+		//if graphic.cycle < 80 {
+		//	graphic.setMode(MODE_OAMSCAN)
+		//
+		//	//} else if graphic.cycle >= 456-80-172 {
+		////} else if graphic.cycle < 80+172 {
+		//	graphic.setMode(MODE_DRAWING)
 
-			//} else if graphic.cycle >= 456-80-172 {
-		} else if graphic.cycle < 80+172 {
-			// if graphic.cpu.Memory[0xFF41] != MODE_DRAWING {
-			// gpulogger.Debug("Entering drawing mode")
-			// }
-			//gpulogger.Debug("Entering Drawing")
-			graphic.setMode(MODE_DRAWING)
-
-			if !graphic.drawnLine {
-				graphic.renderScanline()
-				//graphic.drawFrame()
-				graphic.drawnLine = true
-			}
-		} else {
-			// if graphic.cpu.Memory[0xFF41] != MODE_HBLANK {
-			// 	gpulogger.Debug("Entering Hblank")
-			// }
-			//gpulogger.Debug("Entering HBLANK")
-			graphic.setMode(MODE_HBLANK)
-
+		if !graphic.drawnLine {
+			graphic.renderScanline()
+			//graphic.generatePixels()
+			graphic.drawnLine = true
 		}
+		//} else {
+		//	graphic.setMode(MODE_HBLANK)
+		//
+		//}
 
 	}
 	if graphic.cycle >= CYCLES_PER_LINE {
@@ -818,7 +809,7 @@ func (graphic *Graphics) drawWindow() {
 	}
 }
 
-func (graphic *Graphics) drawFrame() {
+func (graphic *Graphics) generatePixels() {
 	lcdc := graphic.getLCDC()
 
 	bgPixels := graphic.getBackground()
@@ -842,7 +833,7 @@ func (graphic *Graphics) drawFrame() {
 			//if lcdc&(1<<1) != 0 && spritePixels[ly][screenX] != 255 {
 			if lcdc&(1<<1) != 0 {
 				spriteCol := spritePixels[ly][screenX]
-				if spriteCol != 255 && spriteCol != 0 {
+				if spriteCol != 255 {
 					pixel = spriteCol
 				}
 				//pixel = spritePixels[ly][screenX]
@@ -856,6 +847,6 @@ func (graphic *Graphics) drawFrame() {
 }
 
 func (graphic *Graphics) render() {
-	graphic.drawFrame()
+	graphic.generatePixels()
 	graphic.drawScreen()
 }

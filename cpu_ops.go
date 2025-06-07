@@ -92,14 +92,14 @@ func (cpu *CPU) opf0() int {
 // CP A, n8
 func (cpu *CPU) opfe() int {
 	n8 := cpu.getImmediate8()
-	cpu.cpAn8(n8)
+	cpu.cpar8(n8)
 	return 8
 }
 
 // skip review pentru ca nu e folosit
 // SUB A, r8 - r8=H
 func (cpu *CPU) op94() int {
-	cpu.subAr8(cpu.Registers.H)
+	cpu.subar8(cpu.Registers.H)
 	return 4
 }
 
@@ -889,6 +889,1258 @@ func (cpu *CPU) op26() int {
 
 // SUB A, r8 - r8=L
 func (cpu *CPU) op95() int {
-	cpu.subar8(&cpu.Registers.L)
+	cpu.subar8(cpu.Registers.L)
 	return 4
+}
+
+// SRL r8 - r8=A
+func (cpu *CPU) cbop3f() int {
+	cpu.srlr8(&cpu.Registers.A)
+	return 8
+}
+
+// LD r8, [HL] - r8=H
+func (cpu *CPU) op66() int {
+	cpu.ldr8memhl(&cpu.Registers.H)
+	return 8
+}
+
+// BIT u3, [HL] - u3=7
+func (cpu *CPU) cbopbe() int {
+	cpu.bitu3memhl(7)
+	return 16
+}
+
+// SET u3, r8 - u3=0,r8=A
+func (cpu *CPU) cbopc7() int {
+	cpu.setu3r8(0, &cpu.Registers.A)
+	return 8
+}
+
+// SET u3, r8 - u3=7,r8=A
+func (cpu *CPU) cbopff() int {
+	cpu.setu3r8(7, &cpu.Registers.A)
+	return 8
+}
+
+// HALT
+func (cpu *CPU) op76() int {
+	cpu.halt()
+	return 4
+}
+
+// BIT u3, r8 - u3=2,r8=A
+func (cpu *CPU) cbop57() int {
+	cpu.bitu3r8(2, &cpu.Registers.A)
+	return 8
+}
+
+// RRCA
+func (cpu *CPU) op0f() int {
+	cpu.rrca()
+	return 4
+}
+
+// OR A, r8 - r8=D
+func (cpu *CPU) opb2() int {
+	cpu.orA(cpu.Registers.D)
+	return 4
+}
+
+// JP CC, a16 - cc=NC
+func (cpu *CPU) opd2() int {
+	return cpu.jpCCa16(!cpu.Registers.getFlag(flagC))
+}
+
+// OR A, r8 - r8=E
+func (cpu *CPU) opb3() int {
+	cpu.orA(cpu.Registers.E)
+	return 4
+}
+
+// AND A, r8 - r8=B
+func (cpu *CPU) opa0() int {
+	cpu.andA(cpu.Registers.B)
+	return 4
+}
+
+// LD r8, n8 - r8=L
+func (cpu *CPU) op2e() int {
+	cpu.ldr8n8(&cpu.Registers.L)
+	return 8
+}
+
+// ADC A, n8
+func (cpu *CPU) opce() int {
+	cpu.adcan8()
+	return 8
+}
+
+// CP A r8 - r8=B
+func (cpu *CPU) opb8() int {
+	cpu.cpar8(cpu.Registers.B)
+	return 4
+}
+
+// JR CC, e8 - cc=C
+func (cpu *CPU) op38() int {
+	return cpu.jrCCe8(cpu.Registers.getFlag(flagC))
+}
+
+// CALL CC, a16 - cc=Z
+func (cpu *CPU) opcc() int {
+	return cpu.callcca16(cpu.Registers.getFlag(flagZ))
+}
+
+// XOR A, n8
+func (cpu *CPU) opee() int {
+	n8 := cpu.getImmediate8()
+	cpu.xorA(n8)
+	return 8
+}
+
+// BIT u3, r8 - u3=3,r8=A
+func (cpu *CPU) cbop5f() int {
+	cpu.bitu3r8(3, &cpu.Registers.A)
+	return 8
+}
+
+// BIT u3, r8 - u3=6,r8=B
+func (cpu *CPU) cbop70() int {
+	cpu.bitu3r8(6, &cpu.Registers.B)
+	return 8
+}
+
+// BIT u3, r8 - u3=7,r8=B
+func (cpu *CPU) cbop78() int {
+	cpu.bitu3r8(7, &cpu.Registers.B)
+	return 8
+}
+
+// SUB A, n8
+func (cpu *CPU) opd6() int {
+	cpu.suban8()
+	return 8
+}
+
+// BIT u3, r8 - u3=0,r8=A
+func (cpu *CPU) cbop47() int {
+	cpu.bitu3r8(0, &cpu.Registers.A)
+	return 8
+}
+
+// BIT u3, r8 - u3=1,r8=A
+func (cpu *CPU) cbop4f() int {
+	cpu.bitu3r8(1, &cpu.Registers.A)
+	return 8
+}
+
+// BIT u3, r8 - u3=6,r8=A
+func (cpu *CPU) cbop77() int {
+	cpu.bitu3r8(6, &cpu.Registers.A)
+	return 8
+}
+
+// RET CC - cc=C
+func (cpu *CPU) opd8() int {
+	return cpu.retcc(cpu.Registers.getFlag(flagC))
+}
+
+// CP A, [HL]
+func (cpu *CPU) opbe() int {
+	cpu.cpamemhl()
+	return 8
+}
+
+// BIT u3, r8 - u3=1,r8=B
+func (cpu *CPU) cbop48() int {
+	cpu.bitu3r8(1, &cpu.Registers.B)
+	return 8
+}
+
+// BIT u3, r8 - u3=0,r8=C
+func (cpu *CPU) cbop41() int {
+	cpu.bitu3r8(0, &cpu.Registers.C)
+	return 8
+}
+
+// RES u3, r8 - u3=6, r8=B
+func (cpu *CPU) cbopb0() int {
+	cpu.resu3r8(6, &cpu.Registers.B)
+	return 8
+}
+
+// SET u3, [HL] - u3=7
+func (cpu *CPU) cbopfe() int {
+	cpu.setu3memhl(7)
+	return 8
+}
+
+// BIT u3, r8 - u3=5,r8=A
+func (cpu *CPU) cbop6f() int {
+	cpu.bitu3r8(5, &cpu.Registers.A)
+	return 8
+}
+
+// SUB A, r8 - r8=C
+func (cpu *CPU) op91() int {
+	cpu.subar8(cpu.Registers.C)
+	return 4
+}
+
+// SUB A, r8 - r8=B
+func (cpu *CPU) op90() int {
+	cpu.subar8(cpu.Registers.B)
+	return 4
+}
+
+// SLA r8 - r8=E
+func (cpu *CPU) cbop23() int {
+	cpu.slar8(&cpu.Registers.E)
+	return 8
+}
+
+// RL r8 - r8=D
+func (cpu *CPU) cbop12() int {
+	cpu.rlr8(&cpu.Registers.D)
+	return 8
+}
+
+// RET CC - cc=NC
+func (cpu *CPU) opd0() int {
+	return cpu.retcc(!cpu.Registers.getFlag(flagC))
+}
+
+// RL r8 - r8=C
+func (cpu *CPU) cbop11() int {
+	cpu.rlr8(&cpu.Registers.C)
+	return 8
+}
+
+// RL r8 - r8=H
+func (cpu *CPU) cbop14() int {
+	cpu.rlr8(&cpu.Registers.H)
+	return 8
+}
+
+// RL r8 - r8=L
+func (cpu *CPU) cbop15() int {
+	cpu.rlr8(&cpu.Registers.L)
+	return 8
+}
+
+// RL [HL]
+func (cpu *CPU) cbop16() int {
+	cpu.rlmemhl()
+	return 16
+}
+
+// ADC A, r8 - r8=C
+func (cpu *CPU) op89() int {
+	cpu.adcar8(cpu.Registers.C)
+	return 4
+}
+
+// LD r8, r8 - r8=H,C
+func (cpu *CPU) op61() int {
+	cpu.ldr8r8(&cpu.Registers.H, cpu.Registers.C)
+	return 4
+}
+
+// RLA
+func (cpu *CPU) op17() int {
+	cpu.rla()
+	return 4
+}
+
+// CP A, r8 - r8=C
+func (cpu *CPU) opb9() int {
+	cpu.cpar8(cpu.Registers.C)
+	return 4
+}
+
+// SRL r8 - r8=L
+func (cpu *CPU) cbop3d() int {
+	cpu.srlr8(&cpu.Registers.L)
+	return 8
+}
+
+// SUB A, r8 - r8=E
+func (cpu *CPU) op93() int {
+	cpu.subar8(cpu.Registers.E)
+	return 4
+}
+
+// XOR A, [HL]
+func (cpu *CPU) opae() int {
+	hl := cpu.Registers.getHL()
+	value := cpu.memoryRead(hl)
+	cpu.xorA(value)
+	return 8
+}
+
+// SET u3, r8 - u3=1, r8=C
+func (cpu *CPU) cbopc9() int {
+	cpu.setu3r8(1, &cpu.Registers.C)
+	return 8
+}
+
+// SET u3, r8 - u3=2, r8=C
+func (cpu *CPU) cbopd1() int {
+	cpu.setu3r8(2, &cpu.Registers.C)
+	return 8
+}
+
+// BIT u3, r8 - u3=5,r8=C
+func (cpu *CPU) cbop69() int {
+	cpu.bitu3r8(5, &cpu.Registers.C)
+	return 8
+}
+
+// BIT u3, r8 - u3=4,r8=C
+func (cpu *CPU) cbop61() int {
+	cpu.bitu3r8(4, &cpu.Registers.C)
+	return 8
+}
+
+// BIT u3, r8 - u3=6,r8=C
+func (cpu *CPU) cbop71() int {
+	cpu.bitu3r8(6, &cpu.Registers.C)
+	return 8
+}
+
+// BIT u3, r8 - u3=7,r8=C
+func (cpu *CPU) cbop79() int {
+	cpu.bitu3r8(7, &cpu.Registers.C)
+	return 8
+}
+
+// SBC A, r8 - r8=D
+func (cpu *CPU) op9a() int {
+	cpu.sbcar8(cpu.Registers.D)
+	return 4
+}
+
+// RL r8 - r8=B
+func (cpu *CPU) cbop10() int {
+	cpu.rlr8(&cpu.Registers.B)
+	return 8
+}
+
+// SUB A, [HL]
+func (cpu *CPU) op96() int {
+	cpu.subamemhl()
+	return 8
+}
+
+// SBC A, [HL]
+func (cpu *CPU) op9e() int {
+	cpu.sbcamemhl()
+	return 8
+}
+
+// SLA r8 - r8=C
+func (cpu *CPU) cbop21() int {
+	cpu.slar8(&cpu.Registers.C)
+	return 8
+}
+
+// RL A
+func (cpu *CPU) cbop17() int {
+	cpu.rlr8(&cpu.Registers.A)
+	return 8
+}
+
+// SRL r8 - r8=C
+func (cpu *CPU) cbop39() int {
+	cpu.srlr8(&cpu.Registers.C)
+	return 8
+}
+
+// RR r8 - r8=H
+func (cpu *CPU) cbop1c() int {
+	cpu.rrr8(&cpu.Registers.H)
+	return 8
+}
+
+// RR r8 - r8=L
+func (cpu *CPU) cbop1d() int {
+	cpu.rrr8(&cpu.Registers.L)
+	return 8
+}
+
+// ADC A, r8 - r8=H
+func (cpu *CPU) op8c() int {
+	cpu.adcar8(cpu.Registers.H)
+	return 4
+}
+
+// SBC A, n8
+func (cpu *CPU) opde() int {
+	cpu.sbcan8()
+	return 8
+}
+
+// RES u3, [HL] - u3=6
+func (cpu *CPU) cbopb6() int {
+	cpu.resu3memhl(6)
+	return 16
+}
+
+// SRA r8 - r8=A
+func (cpu *CPU) cbop2f() int {
+	cpu.srar8(&cpu.Registers.A)
+	return 8
+}
+
+// SBC A, r8 - r8=C
+func (cpu *CPU) op99() int {
+	cpu.sbcar8(cpu.Registers.C)
+	return 4
+}
+
+// SBC A, r8 - r8=B
+func (cpu *CPU) op98() int {
+	cpu.sbcar8(cpu.Registers.B)
+	return 4
+}
+
+// SET u3, r8 - u3=3, r8=C
+func (cpu *CPU) cbopd9() int {
+	cpu.setu3r8(3, &cpu.Registers.C)
+	return 8
+}
+
+// ADD A, [HL]
+func (cpu *CPU) op86() int {
+	cpu.addamemhl()
+	return 8
+}
+
+// ADC A [HL]
+func (cpu *CPU) op8e() int {
+	cpu.adcamemhl()
+	return 8
+}
+
+// SBC A, r8 - r8=H
+func (cpu *CPU) op9c() int {
+	cpu.sbcar8(cpu.Registers.H)
+	return 4
+}
+
+// SET u3, r8 - u3=0, r8=C
+func (cpu *CPU) cbopc1() int {
+	cpu.setu3r8(0, &cpu.Registers.C)
+	return 8
+}
+
+// SRL r8 - r8=B
+func (cpu *CPU) cbop38() int {
+	cpu.srlr8(&cpu.Registers.B)
+	return 8
+}
+
+// CP A, r8 - r8=L
+func (cpu *CPU) opbd() int {
+	cpu.cpar8(cpu.Registers.L)
+	return 4
+}
+
+// CCF
+func (cpu *CPU) op3f() int {
+	cpu.ccf()
+	return 4
+}
+
+// BIT u3, r8 - u3=4,r8=A
+func (cpu *CPU) cbop67() int {
+	cpu.bitu3r8(4, &cpu.Registers.A)
+	return 8
+}
+
+// SET u3, [HL] - u3=5
+func (cpu *CPU) cbopee() int {
+	cpu.setu3memhl(5)
+	return 16
+}
+
+// RES u3, r8 - u3=0, r8=C
+func (cpu *CPU) cbop81() int {
+	cpu.resu3r8(0, &cpu.Registers.C)
+	return 8
+}
+
+// RES u3, r8 - u3=1, r8=C
+func (cpu *CPU) cbop89() int {
+	cpu.resu3r8(1, &cpu.Registers.C)
+	return 8
+}
+
+// BIT u3, [HL] - u3=3
+func (cpu *CPU) cbop5e() int {
+	cpu.bitu3memhl(3)
+	return 12
+}
+
+// SET u3, [HL] - u3=3
+func (cpu *CPU) cbopde() int {
+	cpu.setu3memhl(3)
+	return 16
+}
+
+// LD r8, r8 - r8=D,C
+func (cpu *CPU) op51() int {
+	cpu.ldr8r8(&cpu.Registers.D, cpu.Registers.C)
+	return 4
+}
+
+// SET u3, r8 - u3=5,r8=A
+func (cpu *CPU) cbopef() int {
+	cpu.setu3r8(5, &cpu.Registers.A)
+	return 8
+}
+
+// BIT u3, [HL] - u3=0
+func (cpu *CPU) cbop46() int {
+	cpu.bitu3memhl(0)
+	return 12
+}
+
+// SUB A, r8 - r8=D
+func (cpu *CPU) op92() int {
+	cpu.subar8(cpu.Registers.D)
+	return 4
+}
+
+// SUB A, r8 - r8=A
+func (cpu *CPU) op97() int {
+	cpu.subar8(cpu.Registers.A)
+	return 4
+}
+
+// AND A, r8 - r8=D
+func (cpu *CPU) opa2() int {
+	cpu.andA(cpu.Registers.D)
+	return 4
+}
+
+// AND A, r8 - r8=E
+func (cpu *CPU) opa3() int {
+	cpu.andA(cpu.Registers.E)
+	return 4
+}
+
+// AND A, r8 - r8=H
+func (cpu *CPU) opa4() int {
+	cpu.andA(cpu.Registers.H)
+	return 4
+}
+
+// AND A, r8 - r8=L
+func (cpu *CPU) opa5() int {
+	cpu.andA(cpu.Registers.L)
+	return 4
+}
+
+// AND A, [HL]
+func (cpu *CPU) opa6() int {
+	hl := cpu.Registers.getHL()
+	value := cpu.memoryRead(hl)
+	cpu.andA(value)
+	return 8
+}
+
+// OR A, r8 - r8=H
+func (cpu *CPU) opb4() int {
+	cpu.orA(cpu.Registers.H)
+	return 4
+}
+
+// OR A, r8 - r8=L
+func (cpu *CPU) opb5() int {
+	cpu.orA(cpu.Registers.L)
+	return 4
+}
+
+// OR A, [HL]
+func (cpu *CPU) opb6() int {
+	hl := cpu.Registers.getHL()
+	value := cpu.memoryRead(hl)
+	cpu.orA(value)
+	return 8
+}
+
+// OR A, r8 - r8=A
+func (cpu *CPU) opb7() int {
+	cpu.orA(cpu.Registers.A)
+	return 4
+}
+
+// XOR A, r8 - r8=B
+func (cpu *CPU) opa8() int {
+	cpu.xorA(cpu.Registers.B)
+	return 4
+}
+
+// XOR A, r8 - r8=D
+func (cpu *CPU) opaa() int {
+	cpu.xorA(cpu.Registers.D)
+	return 4
+}
+
+// XOR A, r8 - r8=E
+func (cpu *CPU) opab() int {
+	cpu.xorA(cpu.Registers.E)
+	return 4
+}
+
+// XOR A, r8 - r8=H
+func (cpu *CPU) opac() int {
+	cpu.xorA(cpu.Registers.H)
+	return 4
+}
+
+// XOR A, r8 - r8=L
+func (cpu *CPU) opad() int {
+	cpu.xorA(cpu.Registers.L)
+	return 4
+}
+
+// ADC A, r8 - r8=B
+func (cpu *CPU) op88() int {
+	cpu.adcar8(cpu.Registers.B)
+	return 4
+}
+
+// ADC A, r8 - r8=D
+func (cpu *CPU) op8a() int {
+	cpu.adcar8(cpu.Registers.D)
+	return 4
+}
+
+// ADC A, r8 - r8=E
+func (cpu *CPU) op8b() int {
+	cpu.adcar8(cpu.Registers.E)
+	return 4
+}
+
+// ADC A, r8 - r8=L
+func (cpu *CPU) op8d() int {
+	cpu.adcar8(cpu.Registers.L)
+	return 4
+}
+
+// ADC A, r8 - r8=A
+func (cpu *CPU) op8f() int {
+	cpu.adcar8(cpu.Registers.A)
+	return 4
+}
+
+// SBC A, r8 - r8=L
+func (cpu *CPU) op9d() int {
+	cpu.sbcar8(cpu.Registers.L)
+	return 4
+}
+
+// SBC A, r8 - r8=A
+func (cpu *CPU) op9f() int {
+	cpu.sbcar8(cpu.Registers.A)
+	return 4
+}
+
+// CP A, r8 - r8=D
+func (cpu *CPU) opba() int {
+	cpu.cpar8(cpu.Registers.D)
+	return 4
+}
+
+// CP A, r8 - r8=E
+func (cpu *CPU) opbb() int {
+	cpu.cpar8(cpu.Registers.E)
+	return 4
+}
+
+// CP A, r8 - r8=H
+func (cpu *CPU) opbc() int {
+	cpu.cpar8(cpu.Registers.H)
+	return 4
+}
+
+// CP A, r8 - r8=A
+func (cpu *CPU) opbf() int {
+	cpu.cpar8(cpu.Registers.A)
+	return 4
+}
+
+// RL r8 - r8=B
+func (cpu *CPU) op10() int {
+	cpu.rlr8(&cpu.Registers.B)
+	return 8
+}
+
+// RLC r8 - r8=B
+func (cpu *CPU) cbop00() int {
+	cpu.rlcr8(&cpu.Registers.B)
+	return 8
+}
+
+// RLC r8 - r8=C
+func (cpu *CPU) cbop01() int {
+	cpu.rlcr8(&cpu.Registers.C)
+	return 8
+}
+
+// RLC r8 - r8=D
+func (cpu *CPU) cbop02() int {
+	cpu.rlcr8(&cpu.Registers.D)
+	return 8
+}
+
+// RLC r8 - r8=E
+func (cpu *CPU) cbop03() int {
+	cpu.rlcr8(&cpu.Registers.E)
+	return 8
+}
+
+// RLC r8 - r8=H
+func (cpu *CPU) cbop04() int {
+	cpu.rlcr8(&cpu.Registers.H)
+	return 8
+}
+
+// BIT u3, r8 - u3=0, r8=B
+func (cpu *CPU) cbop40() int {
+	cpu.bitu3r8(0, &cpu.Registers.B)
+	return 8
+}
+
+// CALL cc - cc=NZ
+func (cpu *CPU) opc4() int {
+	return cpu.callcca16(!cpu.Registers.getFlag(flagZ))
+}
+
+// CALL cc - cc=C
+func (cpu *CPU) opdc() int {
+	return cpu.callcca16(cpu.Registers.getFlag(flagC))
+}
+
+// RES u3, r8 - u3=5, r8=C
+func (cpu *CPU) cbopa9() int {
+	cpu.resu3r8(5, &cpu.Registers.C)
+	return 8
+}
+
+// RL r8 - r8=E
+func (cpu *CPU) cbop13() int {
+	cpu.rlr8(&cpu.Registers.E)
+	return 8
+}
+
+// SWAP r8 - r8=E
+func (cpu *CPU) cbop33() int {
+	cpu.swapr8(&cpu.Registers.E)
+	return 8
+}
+
+// ILLEGAL
+func (cpu *CPU) opfc() int {
+	return 4
+}
+
+// RLC r8 - r8=L
+func (cpu *CPU) cbop05() int {
+	cpu.rlcr8(&cpu.Registers.L)
+	return 8
+}
+
+// RLC [HL]
+func (cpu *CPU) cbop06() int {
+	cpu.rlcmemhl()
+	return 16
+}
+
+// RLC r8 - r8=A
+func (cpu *CPU) cbop07() int {
+	cpu.rlcr8(&cpu.Registers.A)
+	return 8
+}
+
+// RRC r8 - r8=B
+func (cpu *CPU) cbop08() int {
+	cpu.rrcr8(&cpu.Registers.B)
+	return 8
+}
+
+// RRC r8 - r8=C
+func (cpu *CPU) cbop09() int {
+	cpu.rrcr8(&cpu.Registers.C)
+	return 8
+}
+
+// RRC r8 - r8=D
+func (cpu *CPU) cbop0a() int {
+	cpu.rrcr8(&cpu.Registers.D)
+	return 8
+}
+
+// RRC r8 - r8=E
+func (cpu *CPU) cbop0b() int {
+	cpu.rrcr8(&cpu.Registers.E)
+	return 8
+}
+
+// RRC r8 - r8=H
+func (cpu *CPU) cbop0c() int {
+	cpu.rrcr8(&cpu.Registers.H)
+	return 8
+}
+
+// RRC r8 - r8=L
+func (cpu *CPU) cbop0d() int {
+	cpu.rrcr8(&cpu.Registers.L)
+	return 8
+}
+
+// RRC [HL]
+func (cpu *CPU) cbop0e() int {
+	cpu.rrcmemhl()
+	return 8
+}
+
+// RRC r8 - r8=A
+func (cpu *CPU) cbop0f() int {
+	cpu.rrcr8(&cpu.Registers.A)
+	return 8
+}
+
+// RR r8 - r8=B
+func (cpu *CPU) cbop18() int {
+	cpu.rrr8(&cpu.Registers.B)
+	return 8
+}
+
+// RR r8 - r8=C
+func (cpu *CPU) cbop19() int {
+	cpu.rrr8(&cpu.Registers.C)
+	return 8
+}
+
+// RR r8 - r8=D
+func (cpu *CPU) cbop1a() int {
+	cpu.rrr8(&cpu.Registers.D)
+	return 8
+}
+
+// RR r8 - r8=E
+func (cpu *CPU) cbop1b() int {
+	cpu.rrr8(&cpu.Registers.E)
+	return 8
+}
+
+// RR [HL]
+func (cpu *CPU) cbop1e() int {
+	cpu.rrmemhl()
+	return 16
+}
+
+// RR r8 - r8=A
+func (cpu *CPU) cbop1f() int {
+	cpu.rrr8(&cpu.Registers.A)
+	return 8
+}
+
+// SRL r8 - r8=D
+func (cpu *CPU) cbop3a() int {
+	cpu.srlr8(&cpu.Registers.D)
+	return 8
+}
+
+// SRL r8 - r8=E
+func (cpu *CPU) cbop3b() int {
+	cpu.srlr8(&cpu.Registers.E)
+	return 8
+}
+
+// SRL r8 - r8=H
+func (cpu *CPU) cbop3c() int {
+	cpu.srlr8(&cpu.Registers.H)
+	return 8
+}
+
+// SRL [HL]
+func (cpu *CPU) cbop3e() int {
+	cpu.srlmemhl()
+	return 16
+}
+
+// SRA r8 - r8=B
+func (cpu *CPU) cbop28() int {
+	cpu.srar8(&cpu.Registers.B)
+	return 8
+}
+
+// SRA r8 - r8=C
+func (cpu *CPU) cbop29() int {
+	cpu.srar8(&cpu.Registers.C)
+	return 8
+}
+
+// SRA r8 - r8=D
+func (cpu *CPU) cbop2a() int {
+	cpu.srar8(&cpu.Registers.D)
+	return 8
+}
+
+// SRA r8 - r8=E
+func (cpu *CPU) cbop2b() int {
+	cpu.srar8(&cpu.Registers.E)
+	return 8
+}
+
+// SRA r8 - r8=H
+func (cpu *CPU) cbop2c() int {
+	cpu.srar8(&cpu.Registers.H)
+	return 8
+}
+
+// SRA r8 - r8=L
+func (cpu *CPU) cbop2d() int {
+	cpu.srar8(&cpu.Registers.L)
+	return 8
+}
+
+// SRA [HL]
+func (cpu *CPU) cbop2e() int {
+	cpu.sramemhl()
+	return 16
+}
+
+// SLA r8 - r8=B
+func (cpu *CPU) cbop20() int {
+	cpu.slar8(&cpu.Registers.B)
+	return 8
+}
+
+// SLA r8 - r8=D
+func (cpu *CPU) cbop22() int {
+	cpu.slar8(&cpu.Registers.D)
+	return 8
+}
+
+// SLA r8 - r8=H
+func (cpu *CPU) cbop24() int {
+	cpu.slar8(&cpu.Registers.H)
+	return 8
+}
+
+// SLA r8 - r8=L
+func (cpu *CPU) cbop25() int {
+	cpu.slar8(&cpu.Registers.L)
+	return 8
+}
+
+// SLA [HL]
+func (cpu *CPU) cbop26() int {
+	cpu.slamemhl()
+	return 16
+}
+
+// SWAP r8 - r8=B
+func (cpu *CPU) cbop30() int {
+	cpu.swapr8(&cpu.Registers.B)
+	return 8
+}
+
+// SWAP r8 - r8=C
+func (cpu *CPU) cbop31() int {
+	cpu.swapr8(&cpu.Registers.C)
+	return 8
+}
+
+// SWAP r8 - r8=D
+func (cpu *CPU) cbop32() int {
+	cpu.swapr8(&cpu.Registers.D)
+	return 8
+}
+
+// SWAP r8 - r8=H
+func (cpu *CPU) cbop34() int {
+	cpu.swapr8(&cpu.Registers.H)
+	return 8
+}
+
+// SWAP r8 - r8=L
+func (cpu *CPU) cbop35() int {
+	cpu.swapr8(&cpu.Registers.L)
+	return 8
+}
+
+// SWAP [HL]
+func (cpu *CPU) cbop36() int {
+	cpu.swapmemhl()
+	return 8
+}
+
+// CALL cc - cc=NC
+func (cpu *CPU) opd4() int {
+	return cpu.callcca16(!cpu.Registers.getFlag(flagC))
+}
+
+// RES u3, r8 - u3=0, r8=B
+func (cpu *CPU) cbop80() int {
+	cpu.resu3r8(0, &cpu.Registers.B)
+	return 8
+}
+
+// RES u3, r8 - u3=0, r8=D
+func (cpu *CPU) cbop82() int {
+	cpu.resu3r8(0, &cpu.Registers.D)
+	return 8
+}
+
+// RES u3, r8 - u3=0, r8=E
+func (cpu *CPU) cbop83() int {
+	cpu.resu3r8(0, &cpu.Registers.E)
+	return 8
+}
+
+// RES u3, r8 - u3=0, r8=H
+func (cpu *CPU) cbop84() int {
+	cpu.resu3r8(0, &cpu.Registers.H)
+	return 8
+}
+
+// RES u3, r8 - u3=0, r8=L
+func (cpu *CPU) cbop85() int {
+	cpu.resu3r8(0, &cpu.Registers.L)
+	return 8
+}
+
+// RES u3, r8 - u3=1, r8=B
+func (cpu *CPU) cbop88() int {
+	cpu.resu3r8(1, &cpu.Registers.B)
+	return 8
+}
+
+// RES u3, r8 - u3=1, r8=D
+func (cpu *CPU) cbop8a() int {
+	cpu.resu3r8(1, &cpu.Registers.D)
+	return 8
+}
+
+// RES u3, r8 - u3=1, r8=E
+func (cpu *CPU) cbop8b() int {
+	cpu.resu3r8(1, &cpu.Registers.E)
+	return 8
+}
+
+// RES u3, r8 - u3=1, r8=H
+func (cpu *CPU) cbop8c() int {
+	cpu.resu3r8(1, &cpu.Registers.H)
+	return 8
+}
+
+// RES u3, r8 - u3=1, r8=L
+func (cpu *CPU) cbop8d() int {
+	cpu.resu3r8(1, &cpu.Registers.L)
+	return 8
+}
+
+// RES u3, [HL] - u3=1
+func (cpu *CPU) cbop8e() int {
+	cpu.resu3memhl(1)
+	return 8
+}
+
+// RES u3, r8 - u3=1, r8=A
+func (cpu *CPU) cbop8f() int {
+	cpu.resu3r8(1, &cpu.Registers.A)
+	return 8
+}
+
+// RES u3, r8 - u3=2, r8=B
+func (cpu *CPU) cbop90() int {
+	cpu.resu3r8(2, &cpu.Registers.B)
+	return 8
+}
+
+// RES u3, r8 - u3=2, r8=C
+func (cpu *CPU) cbop91() int {
+	cpu.resu3r8(2, &cpu.Registers.C)
+	return 8
+}
+
+// RES u3, r8 - u3=2, r8=D
+func (cpu *CPU) cbop92() int {
+	cpu.resu3r8(2, &cpu.Registers.D)
+	return 8
+}
+
+// RES u3, r8 - u3=2, r8=E
+func (cpu *CPU) cbop93() int {
+	cpu.resu3r8(2, &cpu.Registers.E)
+	return 8
+}
+
+// RES u3, r8 - u3=2, r8=H
+func (cpu *CPU) cbop94() int {
+	cpu.resu3r8(2, &cpu.Registers.H)
+	return 8
+}
+
+// RES u3, r8 - u3=2, r8=L
+func (cpu *CPU) cbop95() int {
+	cpu.resu3r8(2, &cpu.Registers.L)
+	return 8
+}
+
+// RES u3, [HL] - u3=2
+func (cpu *CPU) cbop96() int {
+	cpu.resu3memhl(2)
+	return 8
+}
+
+// RES u3, r8 - u3=2, r8=A
+func (cpu *CPU) cbop97() int {
+	cpu.resu3r8(2, &cpu.Registers.A)
+	return 8
+}
+
+// RES u3, r8 - u3=3, r8=B
+func (cpu *CPU) cbop98() int {
+	cpu.resu3r8(3, &cpu.Registers.B)
+	return 8
+}
+
+// RES u3, r8 - u3=3, r8=C
+func (cpu *CPU) cbop99() int {
+	cpu.resu3r8(3, &cpu.Registers.C)
+	return 8
+}
+
+// RES u3, r8 - u3=3, r8=BB
+func (cpu *CPU) cbop9a() int {
+	cpu.resu3r8(3, &cpu.Registers.D)
+	return 8
+}
+
+// RES u3, r8 - u3=3, r8=E
+func (cpu *CPU) cbop9b() int {
+	cpu.resu3r8(3, &cpu.Registers.E)
+	return 8
+}
+
+// RES u3, r8 - u3=3, r8=H
+func (cpu *CPU) cbop9c() int {
+	cpu.resu3r8(3, &cpu.Registers.H)
+	return 8
+}
+
+// RES u3, r8 - u3=3, r8=L
+func (cpu *CPU) cbop9d() int {
+	cpu.resu3r8(3, &cpu.Registers.L)
+	return 8
+}
+
+// RES u3, [HL] - u3=3
+func (cpu *CPU) cbop9e() int {
+	cpu.resu3memhl(3)
+	return 8
+}
+
+// RES u3, r8 - u3=3, r8=A
+func (cpu *CPU) cbop9f() int {
+	cpu.resu3r8(3, &cpu.Registers.A)
+	return 8
+}
+
+// RES u3, r8 - u3=4, r8=B
+func (cpu *CPU) cbopa0() int {
+	cpu.resu3r8(4, &cpu.Registers.B)
+	return 8
+}
+
+// RES u3, r8 - u3=4, r8=C
+func (cpu *CPU) cbopa1() int {
+	cpu.resu3r8(4, &cpu.Registers.C)
+	return 8
+}
+
+// RES u3, r8 - u3=4, r8=D
+func (cpu *CPU) cbopa2() int {
+	cpu.resu3r8(4, &cpu.Registers.D)
+	return 8
+}
+
+// RES u3, r8 - u3=4, r8=E
+func (cpu *CPU) cbopa3() int {
+	cpu.resu3r8(4, &cpu.Registers.E)
+	return 8
+}
+
+// RES u3, r8 - u3=4, r8=H
+func (cpu *CPU) cbopa4() int {
+	cpu.resu3r8(4, &cpu.Registers.H)
+	return 8
+}
+
+// RES u3, r8 - u3=4, r8=L
+func (cpu *CPU) cbopa5() int {
+	cpu.resu3r8(4, &cpu.Registers.L)
+	return 8
+}
+
+// RES u3, [HL] - u3=4
+func (cpu *CPU) cbopa6() int {
+	cpu.resu3memhl(4)
+	return 8
+}
+
+// RES u3, r8 - u3=4, r8=A
+func (cpu *CPU) cbopa7() int {
+	cpu.resu3r8(4, &cpu.Registers.A)
+	return 8
+}
+
+// RES u3, r8 - u3=5, r8=B
+func (cpu *CPU) cbopa8() int {
+	cpu.resu3r8(5, &cpu.Registers.B)
+	return 8
+}
+
+// RES u3, r8 - u3=5, r8=D
+func (cpu *CPU) cbopaa() int {
+	cpu.resu3r8(5, &cpu.Registers.D)
+	return 8
+}
+
+// RES u3, r8 - u3=5, r8=E
+func (cpu *CPU) cbopab() int {
+	cpu.resu3r8(5, &cpu.Registers.E)
+	return 8
+}
+
+// RES u3, r8 - u3=5, r8=H
+func (cpu *CPU) cbopac() int {
+	cpu.resu3r8(5, &cpu.Registers.H)
+	return 8
+}
+
+// RES u3, r8 - u3=5, r8=L
+func (cpu *CPU) cbopad() int {
+	cpu.resu3r8(5, &cpu.Registers.L)
+	return 8
+}
+
+// RES u3, [HL] - u3=5
+func (cpu *CPU) cbopae() int {
+	cpu.resu3memhl(5)
+	return 8
+}
+
+// RES u3, r8 - u3=5, r8=A
+func (cpu *CPU) cbopaf() int {
+	cpu.resu3r8(5, &cpu.Registers.A)
+	return 8
 }
