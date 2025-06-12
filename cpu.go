@@ -141,13 +141,13 @@ func (cpu *CPU) fetchOpcode() uint8 {
 func (cpu *CPU) push(n uint16) {
 	hi := (n & 0xFF00) >> 8
 	lo := n & 0xFF
-	cpu.Registers.SP -= 2
+	cpu.Registers.SP -= 1
 
+	cpu.memoryWrite(cpu.Registers.SP, uint8(hi))
+	cpu.Registers.SP -= 1
 	if cpu.Registers.SP == 0xFF80 {
 		panic(cpulogger.Error("Stack smash"))
 	}
-
-	cpu.memoryWrite(cpu.Registers.SP+1, uint8(hi))
 	cpu.memoryWrite(cpu.Registers.SP, uint8(lo))
 }
 
@@ -245,8 +245,8 @@ func (cpu *CPU) memoryWrite(address uint16, value byte) {
 		//cpu.graphics.writeVRAM(address, value)
 		cpu.Memory[address] = value
 	} else if address >= OAM_START && address <= OAM_END {
-		if address == 0xFF78 {
-			logger.Debug(fmt.Sprintf("write in 0xFF78 %08b", value))
+		if address == 0xFE00 {
+			logger.Debug(fmt.Sprintf("write in 0xFE00 %08b", value))
 		}
 		cpu.Memory[address] = value
 	} else if address == 0xFF46 {
@@ -278,8 +278,9 @@ func (cpu *CPU) execOpcodes() int {
 
 	isPrefixed := (prefix == 0xcb)
 	opcode := prefix
-
-	cpulogger.Debug(fmt.Sprintf("Executing opcode 0x%x @PC=0x%x A=0x%x F=0x%x DE=0x%x HL=0x%x", opcode, cpu.Registers.PC-1, cpu.Registers.A, cpu.Registers.F, cpu.Registers.getDE(), cpu.Registers.getHL()))
+	IE := cpu.memoryRead(0xFFFF)
+	IF := cpu.memoryRead(0xFF0F)
+	cpulogger.Debug(fmt.Sprintf("Executing opcode 0x%x @PC=0x%x A=0x%x F=0x%x DE=0x%x HL=0x%x IE&IF= 0x%0x", opcode, cpu.Registers.PC-1, cpu.Registers.A, cpu.Registers.F, cpu.Registers.getDE(), cpu.Registers.getHL(), IE&IF))
 	if prefix == 0xcb {
 		// prefixed
 		opcode = cpu.fetchOpcode()
@@ -339,6 +340,16 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = cpu.cbop13()
 		case 0x33:
 			tCycles = cpu.cbop33()
+		case 0xf7:
+			tCycles = cpu.cbopf7()
+		case 0xfd:
+			tCycles = cpu.cbopfd()
+		case 0x49:
+			tCycles = cpu.cbop49()
+		case 0xb8:
+			tCycles = cpu.cbopb8()
+		case 0xf8:
+			tCycles = cpu.cbopf8()
 		////
 		case 0x57:
 			tCycles = cpu.cbop57()
@@ -501,26 +512,6 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = cpu.cbop35()
 		case 0x36:
 			tCycles = cpu.cbop36()
-		case 0x80:
-			tCycles = cpu.cbop80()
-		case 0x82:
-			tCycles = cpu.cbop82()
-		case 0x83:
-			tCycles = cpu.cbop83()
-		case 0x84:
-			tCycles = cpu.cbop84()
-		case 0x85:
-			tCycles = cpu.cbop85()
-		case 0x88:
-			tCycles = cpu.cbop88()
-		case 0x8a:
-			tCycles = cpu.cbop8a()
-		case 0x8b:
-			tCycles = cpu.cbop8b()
-		case 0x8c:
-			tCycles = cpu.cbop8c()
-		case 0x8d:
-			tCycles = cpu.cbop8d()
 		case 0x8e:
 			tCycles = cpu.cbop8e()
 		case 0x8f:
@@ -593,6 +584,194 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = cpu.cbop15()
 		case 0x16:
 			tCycles = cpu.cbop16()
+		case 0xf0:
+			tCycles = cpu.cbopf0()
+		case 0xb1:
+			tCycles = cpu.cbopb1()
+		case 0xb2:
+			tCycles = cpu.cbopb2()
+		case 0xb3:
+			tCycles = cpu.cbopb3()
+		case 0xb4:
+			tCycles = cpu.cbopb4()
+		case 0xb5:
+			tCycles = cpu.cbopb5()
+		case 0xb7:
+			tCycles = cpu.cbopb7()
+		case 0xb9:
+			tCycles = cpu.cbopb9()
+		case 0xba:
+			tCycles = cpu.cbopba()
+		case 0xbb:
+			tCycles = cpu.cbopbb()
+		case 0xbc:
+			tCycles = cpu.cbopbc()
+		case 0xbd:
+			tCycles = cpu.cbopbd()
+		case 0x4d:
+			tCycles = cpu.cbop4d()
+		case 0x4e:
+			tCycles = cpu.cbop4e()
+		case 0x51:
+			tCycles = cpu.cbop51()
+		case 0x52:
+			tCycles = cpu.cbop52()
+		case 0x53:
+			tCycles = cpu.cbop53()
+		case 0x54:
+			tCycles = cpu.cbop54()
+		case 0x55:
+			tCycles = cpu.cbop55()
+		case 0x56:
+			tCycles = cpu.cbop56()
+		case 0x59:
+			tCycles = cpu.cbop59()
+		case 0x5a:
+			tCycles = cpu.cbop5a()
+		case 0x5b:
+			tCycles = cpu.cbop5b()
+		case 0x5c:
+			tCycles = cpu.cbop5c()
+		case 0x5d:
+			tCycles = cpu.cbop5d()
+		case 0x62:
+			tCycles = cpu.cbop62()
+		case 0x63:
+			tCycles = cpu.cbop63()
+		case 0x64:
+			tCycles = cpu.cbop64()
+		case 0x65:
+			tCycles = cpu.cbop65()
+		case 0x66:
+			tCycles = cpu.cbop66()
+		case 0x6a:
+			tCycles = cpu.cbop6a()
+		case 0x6b:
+			tCycles = cpu.cbop6b()
+		case 0x6c:
+			tCycles = cpu.cbop6c()
+		case 0x6d:
+			tCycles = cpu.cbop6d()
+		case 0x6e:
+			tCycles = cpu.cbop6e()
+		case 0x72:
+			tCycles = cpu.cbop72()
+		case 0x73:
+			tCycles = cpu.cbop73()
+		case 0x74:
+			tCycles = cpu.cbop74()
+		case 0x75:
+			tCycles = cpu.cbop75()
+		case 0x76:
+			tCycles = cpu.cbop76()
+		case 0x7a:
+			tCycles = cpu.cbop7a()
+		case 0x7b:
+			tCycles = cpu.cbop7b()
+		case 0x7c:
+			tCycles = cpu.cbop7c()
+		case 0x7d:
+			tCycles = cpu.cbop7d()
+		case 0xc0:
+			tCycles = cpu.cbopc0()
+		case 0xc2:
+			tCycles = cpu.cbopc2()
+		case 0xc3:
+			tCycles = cpu.cbopc3()
+		case 0xc4:
+			tCycles = cpu.cbopc4()
+		case 0xc5:
+			tCycles = cpu.cbopc5()
+		case 0xc6:
+			tCycles = cpu.cbopc6()
+		case 0xc8:
+			tCycles = cpu.cbopc8()
+		case 0xca:
+			tCycles = cpu.cbopca()
+		case 0xcb:
+			tCycles = cpu.cbopcb()
+		case 0xcc:
+			tCycles = cpu.cbopcc()
+		case 0xcd:
+			tCycles = cpu.cbopcd()
+		case 0xce:
+			tCycles = cpu.cbopce()
+		case 0xcf:
+			tCycles = cpu.cbopcf()
+		case 0xd0:
+			tCycles = cpu.cbopd0()
+		case 0xd2:
+			tCycles = cpu.cbopd2()
+		case 0xd3:
+			tCycles = cpu.cbopd3()
+		case 0xd4:
+			tCycles = cpu.cbopd4()
+		case 0xd5:
+			tCycles = cpu.cbopd5()
+		case 0xd6:
+			tCycles = cpu.cbopd6()
+		case 0xd7:
+			tCycles = cpu.cbopd7()
+		case 0xd8:
+			tCycles = cpu.cbopd8()
+		case 0xda:
+			tCycles = cpu.cbopda()
+		case 0xdb:
+			tCycles = cpu.cbopdb()
+		case 0xdc:
+			tCycles = cpu.cbopdc()
+		case 0xdd:
+			tCycles = cpu.cbopdd()
+		case 0xdf:
+			tCycles = cpu.cbopdf()
+		case 0xe0:
+			tCycles = cpu.cbope0()
+		case 0xe1:
+			tCycles = cpu.cbope1()
+		case 0xe2:
+			tCycles = cpu.cbope2()
+		case 0xe3:
+			tCycles = cpu.cbope3()
+		case 0xe4:
+			tCycles = cpu.cbope4()
+		case 0xe5:
+			tCycles = cpu.cbope5()
+		case 0xe6:
+			tCycles = cpu.cbope6()
+		case 0xe7:
+			tCycles = cpu.cbope7()
+		case 0xe8:
+			tCycles = cpu.cbope8()
+		case 0xe9:
+			tCycles = cpu.cbope9()
+		case 0xea:
+			tCycles = cpu.cbopea()
+		case 0xeb:
+			tCycles = cpu.cbopeb()
+		case 0xec:
+			tCycles = cpu.cbopec()
+		case 0xed:
+			tCycles = cpu.cboped()
+		case 0xf1:
+			tCycles = cpu.cbopf1()
+		case 0xf2:
+			tCycles = cpu.cbopf2()
+		case 0xf3:
+			tCycles = cpu.cbopf3()
+		case 0xf4:
+			tCycles = cpu.cbopf4()
+		case 0xf5:
+			tCycles = cpu.cbopf5()
+		case 0xf6:
+			tCycles = cpu.cbopf6()
+		case 0xf9:
+			tCycles = cpu.cbopf9()
+		case 0xfa:
+			tCycles = cpu.cbopfa()
+		case 0xfb:
+			tCycles = cpu.cbopfb()
+		case 0xfc:
+			tCycles = cpu.cbopfc()
 
 		default:
 			panic(cpulogger.Error(fmt.Sprintf("[CB] Opcode 0x%x is not implemented. PC=0x%x", opcode, cpu.Registers.PC-1)))
@@ -932,6 +1111,8 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = cpu.opfc()
 		case 0xff:
 			tCycles = cpu.opff()
+		case 0x1f:
+			tCycles = cpu.op1f()
 		//////////////
 		case 0x33:
 			tCycles = cpu.op33()
@@ -1011,6 +1192,46 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = cpu.op10()
 		case 0xd4:
 			tCycles = cpu.opd4()
+		case 0x37:
+			tCycles = cpu.op37()
+		case 0xf9:
+			tCycles = cpu.opf9()
+		case 0x08:
+			tCycles = cpu.op08()
+		case 0xf8:
+			tCycles = cpu.opf8()
+		case 0x70:
+			tCycles = cpu.op70()
+		case 0x74:
+			tCycles = cpu.op74()
+		case 0x75:
+			tCycles = cpu.op75()
+		case 0x6e:
+			tCycles = cpu.op6e()
+		case 0x7f:
+			tCycles = cpu.op7f()
+		case 0x41:
+			tCycles = cpu.op41()
+		case 0x42:
+			tCycles = cpu.op42()
+		case 0x43:
+			tCycles = cpu.op43()
+		case 0x44:
+			tCycles = cpu.op44()
+		case 0x45:
+			tCycles = cpu.op45()
+		case 0x48:
+			tCycles = cpu.op48()
+		case 0x49:
+			tCycles = cpu.op49()
+		case 0x4a:
+			tCycles = cpu.op4a()
+		case 0x4b:
+			tCycles = cpu.op4b()
+		case 0x4c:
+			tCycles = cpu.op4c()
+		case 0x4d:
+			tCycles = cpu.op4d()
 
 		default:
 			panic(cpulogger.Error(fmt.Sprintf("Opcode 0x%x is not implemented. PC=0x%x", opcode, cpu.Registers.PC-1)))

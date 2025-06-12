@@ -15,9 +15,9 @@ func main() {
 	logger = log.New("main")
 
 	//cartridge, err := LoadCartridge("roms/tetris.gb")
-	//cartridge, err := LoadCartridge("roms/tetris-recompiled.gb")
-	cartridge, err := LoadCartridge("roms/Tennis.gb")
-	//cartridge, err := LoadCartridge("roms/gameGB.gb")
+	cartridge, err := LoadCartridge("roms/tetris-recompiled.gb")
+	//cartridge, err := LoadCartridge("roms/Tennis.gb")
+	//cartridge, err := LoadCartridge("roms/gameGB.gba")
 	//cartridge, err := LoadCartridge("roms/Qix.gb")
 	//cartridge, err := LoadCartridge("roms/hello-world.gb")
 

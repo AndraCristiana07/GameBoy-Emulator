@@ -112,8 +112,8 @@ func (cpu *CPU) dmaTransfer(value uint8) {
 		gpulogger.Debug(fmt.Sprintf("upper with i is 0x%02X", upper+uint16(i)))
 
 		gpulogger.Debug(fmt.Sprintf("OAM at 0x%02X will be: 0x%02X", OAM_START+uint16(i), cpu.Memory[upper+uint16(i)]))
-		if OAM_START+uint16(i) == 0xFF78 {
-			logger.Debug(fmt.Sprintf("write in 0xFF78 %08b", value))
+		if OAM_START+uint16(i) == 0xFE00 {
+			logger.Debug(fmt.Sprintf("write in 0xFE00 %08b", value))
 
 		}
 		cpu.Memory[OAM_START+uint16(i)] = cpu.Memory[upper+uint16(i)]

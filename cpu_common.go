@@ -25,6 +25,16 @@ func (cpu *CPU) jump(addr uint16) {
 	cpu.Registers.PC = addr
 }
 
+// STOP n8
+func (cpu *CPU) stop() {
+	n8 := cpu.getImmediate8()
+	if n8 != 0x00 {
+		cpulogger.Debug(fmt.Sprintf("STOP -> imm is 0x%02X", n8))
+	}
+	cpu.Registers.PC++
+	cpu.stopped = true
+}
+
 // XOR - writes to A
 func (cpu *CPU) xorA(other uint8) {
 	res := cpu.Registers.A ^ other
@@ -49,20 +59,22 @@ func (cpu *CPU) ldr8n8(register *uint8) {
 	*register = n8
 }
 
-// LD [HL],r8
-func (cpu *CPU) ldmemhlr8(register uint8) {
-	cpu.memoryWrite(cpu.Registers.getHL(), register)
+// LD [HL], r8/n8
+func (cpu *CPU) ldmemhl(other uint8) {
+	cpu.memoryWrite(cpu.Registers.getHL(), other)
 }
 
 // DEC r8
 func (cpu *CPU) decr8(register *uint8) {
-	reg := *register
+	value := *register
 	*register--
 	cpu.Registers.setFlag(flagZ, *register == 0)
 	cpu.Registers.setFlag(flagN, true)
 	// Set if borrow from bit 4
-	halfCarry := (reg & 0b10000) != (*register & 0b10000)
-	cpu.Registers.setFlag(flagH, halfCarry)
+	//halfCarry := (reg & 0b10000) != (*register & 0b10000)
+	//halfCarry := (value&0b1111)-1 > 0b1111
+	halfCarry := value & 0b1111
+	cpu.Registers.setFlag(flagH, halfCarry == 0x00)
 }
 
 // JR cc, e8
@@ -94,6 +106,7 @@ func (cpu *CPU) ldhmema8r8(register uint8) {
 	cpulogger.Info(fmt.Sprintf("after operation %x ", cpu.memoryRead(addr)))
 }
 
+// /////////////////////////
 // LDH r8, [a8]
 func (cpu *CPU) ldhr8mema8(register *uint8) {
 	a8 := cpu.getImmediate8()
@@ -104,13 +117,17 @@ func (cpu *CPU) ldhr8mema8(register *uint8) {
 }
 
 // compares with A
-func (cpu *CPU) cpar8(other uint8) {
-	res := uint16(cpu.Registers.A) - uint16(other)
+func (cpu *CPU) cpa(other uint8) {
+	a := cpu.Registers.A
+	//res := uint16(a) - uint16(other)
+	res := a - other
+
 	// if borrow from bit 4
-	halfCarry := (cpu.Registers.A & 0b10000) != uint8(res&0b10000)
+	//halfCarry := (cpu.Registers.A & 0b10000) != uint8(res&0b10000)
+	halfCarry := (a & 0b1111) < (other & 0b1111)
 	// if borrow
-	carryFlag := other > cpu.Registers.A
-	cpu.Registers.setFlag(flagZ, uint8(res) == 0)
+	carryFlag := uint16(other) > uint16(a)
+	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, true)
 	cpu.Registers.setFlag(flagH, halfCarry)
 	cpu.Registers.setFlag(flagC, carryFlag)
@@ -118,12 +135,14 @@ func (cpu *CPU) cpar8(other uint8) {
 
 // SUB A, r8
 func (cpu *CPU) subar8(other uint8) {
-	res := cpu.Registers.A - other
+	a := cpu.Registers.A
+	res := a - other
 	// if borrow from bit 4
-	halfCarry := (cpu.Registers.A & 0b01111) != uint8(res&0b10000)
+	//halfCarry := (cpu.Registers.A & 0b01111) != uint8(res&0b10000)
+	halfCarry := (a & 0b1111) < (other & 0b1111)
 	//halfCarry := (cpu.Registers.A & 0b10000) < (other & 0b10000)
 	// if borrow
-	carryFlag := other > cpu.Registers.A
+	carryFlag := uint16(other) > uint16(a)
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, true)
 	cpu.Registers.setFlag(flagH, halfCarry)
@@ -143,12 +162,6 @@ func (cpu *CPU) ldspn16() {
 	cpu.Registers.SP = n16
 }
 
-// RST
-func (cpu *CPU) rst(address uint16) {
-	cpu.push(cpu.Registers.PC)
-	cpu.jump(address)
-}
-
 // LD r8, [HL]
 func (cpu *CPU) ldr8memhl(register *uint8) {
 	*register = cpu.memoryRead(cpu.Registers.getHL())
@@ -164,19 +177,29 @@ func (cpu *CPU) ldhmemca() {
 
 // INC r8
 func (cpu *CPU) incr8(register *uint8) {
+	value := *register
 	*register++
 	cpu.Registers.setFlag(flagZ, *register == 0)
 	cpu.Registers.setFlag(flagN, false)
 	// Set if overflow from bit 3
-	halfCarry := *register > 0b1111
-	cpu.Registers.setFlag(flagH, halfCarry)
+	//halfCarry := value > 0b1111
+	halfCarry := value & 0b1111
+	//halfCarry := (value&0b1111)+1 > 0b1111
+	cpu.Registers.setFlag(flagH, halfCarry == 0)
 }
 
+// /////////////////////////////////////
 // CALL a16
 func (cpu *CPU) calla16() {
 	a16 := cpu.getImmediate16()
 	cpu.push(cpu.Registers.PC)
 	cpu.jump(a16)
+}
+
+// CALL
+func (cpu *CPU) call(adress uint16) {
+	cpu.push(cpu.Registers.PC)
+	cpu.jump(adress)
 }
 
 // DEC r16
@@ -247,17 +270,21 @@ func (cpu *CPU) scf() {
 	cpu.Registers.setFlag(flagC, true)
 }
 
+// //////////////////////////
 // ADD HL, r16
 func (cpu *CPU) addhlr16(r16getter func() uint16) {
 	hl := cpu.Registers.getHL()
-	res := hl + r16getter()
+	r16 := r16getter()
+	res := hl + r16
 	cpu.Registers.setHL(res)
 	cpu.Registers.setFlag(flagN, false)
 	//halfCarry := res > 0b111111111111
-	halfCarry := ((hl & 0b111111111111) + (r16getter() & 0b111111111111)) > 0b111111111111
+	halfCarry := ((hl & 0b111111111111) + (r16 & 0b111111111111)) > 0b111111111111
 	cpu.Registers.setFlag(flagH, halfCarry)
 	//carry := res > 0b1111111111111111
-	carry := uint32(hl)+uint32(r16getter()) > 0b1111111111111111
+	//carry := uint32(hl)+uint32(r16) > 0b1111111111111111
+	carry := uint32(hl)+uint32(r16) > 0b1111111111111111
+
 	cpu.Registers.setFlag(flagC, carry)
 }
 
@@ -291,9 +318,11 @@ func (cpu *CPU) cpl() {
 // SWAP r8
 func (cpu *CPU) swapr8(register *uint8) {
 	val := *register
-	swap := (val>>4)&0b00001111 | (val<<4)&0b11110000
+	//swap := (val>>4)&0b00001111 | (val<<4)&0b11110000
+	swap := (val >> 4) | (val << 4)
+
 	*register = swap
-	cpu.Registers.setFlag(flagZ, swap == 0)
+	cpu.Registers.setFlag(flagZ, val == 0x00)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
 	cpu.Registers.setFlag(flagC, false)
@@ -329,11 +358,13 @@ func (cpu *CPU) resu3r8(u3 uint8, register *uint8) {
 
 // LD [r16], A
 func (cpu *CPU) ldmemr16A(r16getter func() uint16) {
-	cpulogger.Debug(fmt.Sprintf("addr %x in memory %x register A %x", r16getter(), cpu.Memory[r16getter()], cpu.Registers.A))
-	cpu.memoryWrite(r16getter(), cpu.Registers.A)
+	r16 := r16getter()
+	cpulogger.Debug(fmt.Sprintf("addr %x in memory %x register A %x", r16, cpu.Memory[r16], cpu.Registers.A))
+	cpu.memoryWrite(r16, cpu.Registers.A)
 
 }
 
+// ///////////////////////////////
 // INC r16
 func (cpu *CPU) incr16(r16getter func() uint16, r16setter func(value uint16)) {
 	value := r16getter()
@@ -351,14 +382,14 @@ func (cpu *CPU) ldamemr16(r16getter func() uint16) {
 func (cpu *CPU) ldmemhlda() {
 	hl := cpu.Registers.getHL()
 	cpu.memoryWrite(hl, cpu.Registers.A)
-	cpu.Registers.setHL(hl - 1)
+	cpu.hldec()
 }
 
 // LD [HLI], A
 func (cpu *CPU) ldmemhlia() {
 	hl := cpu.Registers.getHL()
 	cpu.memoryWrite(hl, cpu.Registers.A)
-	cpu.Registers.setHL(hl + 1)
+	cpu.hlinc()
 }
 
 // JP cc, a16
@@ -383,7 +414,7 @@ func (cpu *CPU) ldamemhli() {
 	hl := cpu.Registers.getHL()
 	value := cpu.memoryRead(hl)
 	cpu.Registers.A = value
-	cpu.Registers.setHL(hl + 1)
+	cpu.hlinc()
 }
 
 // ADD A, n8
@@ -411,6 +442,7 @@ func (cpu *CPU) bitu3r8(u3 uint8, register *uint8) {
 	cpu.Registers.setFlag(flagH, true)
 }
 
+// //////////////////////////////////
 // RES u3, [HL]
 func (cpu *CPU) resu3memhl(u3 uint8) {
 	hl := cpu.Registers.getHL()
@@ -429,9 +461,9 @@ func (cpu *CPU) decmemhl() {
 	cpu.Registers.setFlag(flagN, true)
 	// Set if borrow from bit 4
 	//halfCarry := (uint8(newVal) & 0b10000) != (uint8(val) & 0b10000) //TODO?
-	halfCarry := val&0b1111 == 0
+	halfCarry := val & 0b1111
 
-	cpu.Registers.setFlag(flagH, halfCarry)
+	cpu.Registers.setFlag(flagH, halfCarry == 0x00)
 
 }
 
@@ -447,7 +479,9 @@ func (cpu *CPU) sbcar8(register uint8) {
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, true)
 	// Set if borrow from bit 4
-	halfCarry := (a & 0b10000) != (res & 0b10000)
+	//halfCarry := (a & 0b10000) != (res & 0b10000)
+	halfCarry := (a & 0b1111) < (n & 0b1111)
+
 	cpu.Registers.setFlag(flagH, halfCarry)
 	// Set if borrow (i.e. if (r8 + carry) > A)
 	newCarry := n > a
@@ -472,29 +506,37 @@ func (cpu *CPU) ldamemhld() {
 	hl := cpu.Registers.getHL()
 	value := cpu.memoryRead(hl)
 	cpu.Registers.A = value
-	cpu.Registers.setHL(hl - 1)
+	cpu.hldec()
 }
 
 // ADD HL, SP
 func (cpu *CPU) addhlsp() {
 	hl := cpu.Registers.getHL()
-	res := hl + cpu.Registers.SP
+	sp := cpu.Registers.SP
+	res := hl + sp
+
 	cpu.Registers.setHL(res)
+
+	//cpu.Registers.setFlag(flagZ, false)
+	cpu.Registers.setFlag(flagN, false)
+	// Set if overflow from bit 11
+	//halfCarry := ((hl & 0b111111111111) + (sp & 0b111111111111)) > 0b111111111111
+	halfCarry := ((hl & 0b111111111111) + (sp & 0b111111111111)) > 0b111111111111
+	cpu.Registers.setFlag(flagH, halfCarry)
+	// Set if overflow from bit 15
+	carry := uint32(hl)+uint32(sp) > 0b1111111111111111
+	//carry := (hl)+(sp) > 0b1111111111111111
+
+	cpu.Registers.setFlag(flagC, carry)
+
 }
 
 // LD SP, HL
-func (cpu *CPU) ldspr16(r16getter func() uint16) {
-	reg := r16getter()
-	sp := cpu.Registers.SP
-	res := sp + reg
-	cpu.Registers.SP = res
-	cpu.Registers.setFlag(flagN, false)
-	//halfCarry := res > 0b111111111111
-	halfCarry := ((sp & 0b111111111111) + (reg & 0b111111111111)) > 0b111111111111
-	cpu.Registers.setFlag(flagH, halfCarry)
-	//carry := res > 0b1111111111111111
-	carry := ((sp & 0b1111111111111111) + (reg & 0b1111111111111111)) > 0b1111111111111111
-	cpu.Registers.setFlag(flagC, carry)
+func (cpu *CPU) ldsphl() {
+
+	hl := cpu.Registers.getHL()
+	cpu.Registers.SP = hl
+
 }
 
 // SLA r8
@@ -502,13 +544,15 @@ func (cpu *CPU) slar8(register *uint8) {
 	val := *register
 	res := val << 1
 	// bit 0 of register is reset to 0
-	res &= 0b11111110
+	//res &= 0b11111110
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
 	// set when a rotate/shift operation shifts out a “1” bit
-	carry := (val & 0b10000000) >> 7
-	cpu.Registers.setFlag(flagH, carry != 0x00)
+	carry := val & 0b10000000
+	//carry := (val & 0b10000000) >> 7
+
+	cpu.Registers.setFlag(flagC, carry != 0x00)
 	*register = res
 }
 
@@ -522,6 +566,7 @@ func (cpu *CPU) bitu3memhl(u3 uint8) {
 	cpu.Registers.setFlag(flagH, true)
 }
 
+// /////////////////////////////
 // INC SP
 func (cpu *CPU) incsp() {
 	sp := cpu.Registers.SP
@@ -542,10 +587,12 @@ func (cpu *CPU) addspe8() {
 	cpu.Registers.setFlag(flagZ, false)
 	cpu.Registers.setFlag(flagN, false)
 	// Set if overflow from bit 3
-	halfCarry := res > 0b1111
+	//halfCarry := res > 0b1111
+	halfCarry := ((sp & 0b1111) + (uint16(e8) & 0b1111)) > 0b1111
 	cpu.Registers.setFlag(flagH, halfCarry)
 	//Set if overflow from bit 7
-	carry := res > 0b11111111
+	//carry := res > 0b11111111
+	carry := ((sp & 0b11111111) + (uint16(e8) & 0b11111111)) > 0b11111111
 	cpu.Registers.setFlag(flagC, carry)
 	cpu.Registers.SP = res
 
@@ -556,7 +603,7 @@ func (cpu *CPU) srlr8(register *uint8) {
 	val := *register
 	res := val >> 1
 	// bit 7 of register is reset to 0
-	res &= 0b01111111
+	//res &= 0b01111111
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
@@ -593,8 +640,13 @@ func (cpu *CPU) halt() {
 
 // RRCA
 func (cpu *CPU) rrca() {
-	carry := cpu.Registers.A & 0b00000001
+	a := cpu.Registers.A
+	carry := a & 0b00000001
 	res := (cpu.Registers.A >> 1) | (carry << 7)
+	//res := a >> 1
+	//if carry == 0x01 {
+	//	res = a>>1 | (0b10000000)
+	//}
 	cpu.Registers.A = res
 	cpu.Registers.setFlag(flagZ, false)
 	cpu.Registers.setFlag(flagN, false)
@@ -614,7 +666,7 @@ func (cpu *CPU) adcan8() {
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	// Set if overflow from bit 3
-	halfCarry := ((a & 0b1111) + (n8 & 0b1111) + carry) > 0b1111
+	halfCarry := ((a & 0b1111) + (n8 & 0b1111) + (carry & 0b1111)) > 0b1111
 	cpu.Registers.setFlag(flagH, halfCarry)
 	// Set if overflow from bit 7
 	newCarry := (uint16(a) + uint16(n8) + uint16(carry)) > 0b11111111
@@ -636,14 +688,18 @@ func (cpu *CPU) callcca16(flag bool) int {
 
 }
 
+// //////////////////////////////
+// SUB A, n8
 func (cpu *CPU) suban8() {
 	n8 := cpu.getImmediate8()
-	res := cpu.Registers.A - n8
+	a := cpu.Registers.A
+	res := a - n8
 	// if borrow from bit 4
-	halfCarry := (cpu.Registers.A & 0b01111) != uint8(res&0b10000)
-	//halfCarry := (cpu.Registers.A & 0b10000) < (other & 0b10000)
+	//halfCarry := (cpu.Registers.A & 0b01111) != uint8(res&0b10000)
+	halfCarry := (a & 0b1111) < (n8 & 0b1111)
+	//halfCarry := (cpu.Registers.A & 0b10000) < (n8 & 0b10000)
 	// if borrow
-	carryFlag := n8 > cpu.Registers.A
+	carryFlag := uint16(n8) > uint16(a)
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, true)
 	cpu.Registers.setFlag(flagH, halfCarry)
@@ -655,11 +711,13 @@ func (cpu *CPU) suban8() {
 func (cpu *CPU) cpamemhl() {
 	hl := cpu.Registers.getHL()
 	value := cpu.memoryRead(hl)
-	res := cpu.Registers.A - value
+	a := cpu.Registers.A
+	res := a - value
 	// if borrow from bit 4
-	halfCarry := cpu.Registers.A&0b10000 != res&0b10000
+	//halfCarry := cpu.Registers.A&0b10000 != res&0b10000
+	halfCarry := (a & 0b1111) < (value & 0b1111)
 	// if borrow
-	carryFlag := value > cpu.Registers.A
+	carryFlag := value > a
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, true)
 	cpu.Registers.setFlag(flagH, halfCarry)
@@ -702,7 +760,7 @@ func (cpu *CPU) adcar8(register uint8) {
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	// Set if overflow from bit 3
-	halfCarry := ((a & 0b1111) + (register & 0b1111) + carry) > 0b1111
+	halfCarry := ((a & 0b1111) + (register & 0b1111) + (carry & 0b1111)) > 0b1111
 	cpu.Registers.setFlag(flagH, halfCarry)
 	// Set if overflow from bit 7
 	newCarry := (uint16(a) + uint16(register) + uint16(carry)) > 0b11111111
@@ -719,7 +777,7 @@ func (cpu *CPU) rla() {
 	a := cpu.Registers.A
 	newCarry := (a & 0b10000000) >> 7
 	res := (a << 1) | carry
-	cpu.Registers.setFlag(flagZ, res == 0x00)
+	cpu.Registers.setFlag(flagZ, false)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
 	cpu.Registers.setFlag(flagC, newCarry == 0x01)
@@ -730,12 +788,13 @@ func (cpu *CPU) rla() {
 func (cpu *CPU) subamemhl() {
 	hl := cpu.Registers.getHL()
 	value := cpu.memoryRead(hl)
-	res := cpu.Registers.A - value
+	a := cpu.Registers.A
+	res := a - value
 	// if borrow from bit 4
-	halfCarry := (cpu.Registers.A & 0b01111) != uint8(res&0b10000)
-	//halfCarry := (cpu.Registers.A & 0b10000) < (other & 0b10000)
+	//halfCarry := (cpu.Registers.A & 0b10000) != uint8(res&0b10000)
+	halfCarry := (a & 0b1111) < (value & 0b1111)
 	// if borrow
-	carryFlag := value > cpu.Registers.A
+	carryFlag := uint16(value) > uint16(a)
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, true)
 	cpu.Registers.setFlag(flagH, halfCarry)
@@ -757,28 +816,36 @@ func (cpu *CPU) sbcamemhl() {
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, true)
 	// Set if borrow from bit 4
-	halfCarry := (a & 0b10000) != (res & 0b10000)
+	//halfCarry := (a & 0b10000) != (res & 0b10000)
+	halfCarry := (a & 0b1111) < (value&0b1111)+carry
+
 	cpu.Registers.setFlag(flagH, halfCarry)
 	// Set if borrow (i.e. if (r8 + carry) > A)
-	newCarry := n > a
+	newCarry := uint16(value)+uint16(carry) > uint16(a)
 	cpu.Registers.setFlag(flagC, newCarry)
 	cpu.Registers.A = res
 }
 
+// ////////////////////////
 // RR r8
 func (cpu *CPU) rrr8(register *uint8) {
+	value := *register
+	//res := value >> 1
 	carry := uint8(0)
 	if cpu.Registers.getFlag(flagC) {
 		carry = uint8(0b10000000)
 	}
-	value := *register
+	//if cpu.Registers.getFlag(flagC) {
+	//	res = uint8(0b10000000) | (value >> 1)
+	//}
 	newCarry := value & 0b00000001
 	res := (value >> 1) | carry
+	*register = res
+
 	cpu.Registers.setFlag(flagZ, res == 0x00)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
-	cpu.Registers.setFlag(flagC, newCarry == 0x01)
-	*register = res
+	cpu.Registers.setFlag(flagC, newCarry != 0x00)
 }
 
 // SBC A, n8
@@ -794,10 +861,17 @@ func (cpu *CPU) sbcan8() {
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, true)
 	// Set if borrow from bit 4
-	halfCarry := (a & 0b10000) != (res & 0b10000)
+	//halfCarry := (a & 0b10000) != (res & 0b10000)
+	halfCarry := (a & 0b1111) < (n8&0b1111)+carry
+
 	cpu.Registers.setFlag(flagH, halfCarry)
 	// Set if borrow (i.e. if (r8 + carry) > A)
-	newCarry := n > a
+	newCarry := uint16(n8)+uint16(carry) > uint16(a)
+
+	//halfCarry := (a & 0b1111) < (n & 0b1111)
+	//cpu.Registers.setFlag(flagH, halfCarry)
+	//// Set if borrow (i.e. if (r8 + carry) > A)
+	//newCarry := uint16(n) > uint16(a)
 	cpu.Registers.setFlag(flagC, newCarry)
 	cpu.Registers.A = res
 }
@@ -805,7 +879,7 @@ func (cpu *CPU) sbcan8() {
 // SRA r8
 func (cpu *CPU) srar8(register *uint8) {
 	val := *register
-	bit7 := val & 0b00000001
+	bit7 := val & 0b10000000
 	res := val >> 1
 	res |= bit7
 	// bit 7 of register is unchanged
@@ -814,7 +888,7 @@ func (cpu *CPU) srar8(register *uint8) {
 	cpu.Registers.setFlag(flagH, false)
 	// set when a rotate/shift operation shifts out a “1” bit
 	carry := val & 0b00000001
-	cpu.Registers.setFlag(flagH, carry != 0x00)
+	cpu.Registers.setFlag(flagC, carry != 0x00)
 	*register = res
 }
 
@@ -825,6 +899,7 @@ func (cpu *CPU) addamemhl() {
 	a := cpu.Registers.A
 	res := a + value
 	cpu.Registers.A = res
+
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	// Set if overflow from bit 3
@@ -846,10 +921,11 @@ func (cpu *CPU) adcamemhl() {
 	value := cpu.memoryRead(hl)
 	a := cpu.Registers.A
 	res := a + carry + value
+
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	// Set if overflow from bit 3
-	halfCarry := ((a & 0b1111) + (value & 0b1111) + carry) > 0b1111
+	halfCarry := ((a & 0b1111) + (value & 0b1111) + (carry & 0b1111)) > 0b1111
 	cpu.Registers.setFlag(flagH, halfCarry)
 	// Set if overflow from bit 7
 	newCarry := (uint16(a) + uint16(value) + uint16(carry)) > 0b11111111
@@ -864,6 +940,8 @@ func (cpu *CPU) ccf() {
 		carry = false
 	}
 	cpu.Registers.setFlag(flagC, carry)
+	cpu.Registers.setFlag(flagN, false)
+	cpu.Registers.setFlag(flagH, false)
 }
 
 // RLC r8
@@ -891,16 +969,21 @@ func (cpu *CPU) rlcmemhl() {
 	cpu.Registers.setFlag(flagC, carry == 0x01)
 }
 
+// ////////////////////////////
 // RRC r8
 func (cpu *CPU) rrcr8(register *uint8) {
 	value := *register
 	carry := value & 0b00000001
 	res := (value >> 1) | (carry << 7)
+	//res := value >> 1
+	//if carry == 0x01 {
+	//	res = 0b10000000 | (value >> 1)
+	//}
 	*register = res
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
-	cpu.Registers.setFlag(flagC, carry == 0x01)
+	cpu.Registers.setFlag(flagC, carry != 0x00)
 }
 
 // RRC [HL]
@@ -908,28 +991,38 @@ func (cpu *CPU) rrcmemhl() {
 	hl := cpu.Registers.getHL()
 	value := cpu.memoryRead(hl)
 	carry := value & 0b00000001
-	res := (value >> 1) | (carry << 7)
+	//res := (value >> 1) | (carry << 7)
+	res := value >> 1
+	if carry == 0x01 {
+		res = 0b10000000 | (value >> 1)
+	}
 	cpu.memoryWrite(hl, res)
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
-	cpu.Registers.setFlag(flagC, carry == 0x01)
+	cpu.Registers.setFlag(flagC, carry != 0x00)
 }
 
-// RR r8
+// RR [HL]
 func (cpu *CPU) rrmemhl() {
+	hl := cpu.Registers.getHL()
+	value := cpu.memoryRead(hl)
 	carry := uint8(0)
 	if cpu.Registers.getFlag(flagC) {
 		carry = uint8(0b10000000)
 	}
-	hl := cpu.Registers.getHL()
-	value := cpu.memoryRead(hl)
-	newCarry := value & 0b00000001
+	//res := value >> 1
+	//if cpu.Registers.getFlag(flagC) {
+	//	res = uint8(0b10000000) | (value >> 1)
+	//}
 	res := (value >> 1) | carry
+	newCarry := value & 0b00000001
+
+	//res := carry | (value >> 1)
 	cpu.Registers.setFlag(flagZ, res == 0x00)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
-	cpu.Registers.setFlag(flagC, newCarry == 0x01)
+	cpu.Registers.setFlag(flagC, newCarry != 0x00)
 	cpu.memoryWrite(hl, res)
 }
 
@@ -937,57 +1030,65 @@ func (cpu *CPU) rrmemhl() {
 func (cpu *CPU) srlmemhl() {
 	hl := cpu.Registers.getHL()
 	value := cpu.memoryRead(hl)
+	carry := value & 0b00000001
 	res := value >> 1
 	// bit 7 of register is reset to 0 ?
-	res &= 0b01111111
+	//res &= 0b01111111
+	cpu.memoryWrite(hl, res)
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
-	carry := value & 0b00000001
 	cpu.Registers.setFlag(flagC, carry != 0x00)
-	cpu.memoryWrite(hl, res)
 }
 
 // SRA [HL]
 func (cpu *CPU) sramemhl() {
 	hl := cpu.Registers.getHL()
 	value := cpu.memoryRead(hl)
-	bit7 := value & 0b00000001
-	res := value >> 1
-	res |= bit7
+	bit7 := value & 0b10000000
+	res := (value >> 1) | bit7
+	carry := value & 0b00000001
+
 	// bit 7 of register is unchanged
+	cpu.memoryWrite(hl, res)
+
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
 	// set when a rotate/shift operation shifts out a “1” bit
-	carry := value & 0b00000001
-	cpu.Registers.setFlag(flagH, carry != 0x00)
-	cpu.memoryWrite(hl, res)
+	cpu.Registers.setFlag(flagC, carry != 0x00)
 }
 
 // SLA [HL]
 func (cpu *CPU) slamemhl() {
 	hl := cpu.Registers.getHL()
 	value := cpu.memoryRead(hl)
+	// set when a rotate/shift operation shifts out a “1” bit
+	carry := value & 0b10000000
+	//carry := (value & 0b10000000) >> 7
+
 	res := value << 1
-	// bit 0 of register is reset to 0
-	res &= 0b11111110
+	//// bit 0 of register is reset to 0
+	//res &= 0b11111110
+
+	cpu.memoryWrite(hl, res)
+
 	cpu.Registers.setFlag(flagZ, res == 0)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
-	// set when a rotate/shift operation shifts out a “1” bit
-	carry := (value & 0b10000000) >> 7
-	cpu.Registers.setFlag(flagH, carry != 0x00)
-	cpu.memoryWrite(hl, res)
+
+	cpu.Registers.setFlag(flagC, carry != 0x00)
 }
 
-// SWAP r8
+// SWAP [HL]
 func (cpu *CPU) swapmemhl() {
 	hl := cpu.Registers.getHL()
 	value := cpu.memoryRead(hl)
-	swap := (value>>4)&0b00001111 | (value<<4)&0b11110000
+	//swap := (value>>4)&0b00001111 | (value<<4)&0b11110000
+	swap := (value >> 4) | (value << 4)
+
 	cpu.memoryWrite(hl, swap)
-	cpu.Registers.setFlag(flagZ, swap == 0)
+	cpu.Registers.setFlag(flagZ, value == 0x00)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
 	cpu.Registers.setFlag(flagC, false)
@@ -1001,12 +1102,74 @@ func (cpu *CPU) rlmemhl() {
 	}
 	hl := cpu.Registers.getHL()
 	value := cpu.memoryRead(hl)
+	//newCarry := value & 0b10000000
 	newCarry := (value & 0b10000000) >> 7
 	res := (value << 1) | carry
+
+	cpu.memoryWrite(hl, res)
 	cpu.Registers.setFlag(flagZ, res == 0x00)
 	cpu.Registers.setFlag(flagN, false)
 	cpu.Registers.setFlag(flagH, false)
 	cpu.Registers.setFlag(flagC, newCarry == 0x01)
-	cpu.memoryWrite(hl, res)
 
+}
+
+// RRA
+func (cpu *CPU) rra() {
+	a := cpu.Registers.A
+	carry := uint8(0)
+	if cpu.Registers.getFlag(flagC) {
+		carry = uint8(0b10000000)
+	}
+	res := (a >> 1) | carry
+	//res := a >> 1
+	//if cpu.Registers.getFlag(flagC) {
+	//	res = (a >> 1) | (0b10000000)
+	//}
+	newCarry := a & 0b00000001
+	//res := carry | (value >> 1)
+	cpu.Registers.A = res
+
+	cpu.Registers.setFlag(flagZ, false)
+	cpu.Registers.setFlag(flagN, false)
+	cpu.Registers.setFlag(flagH, false)
+	cpu.Registers.setFlag(flagC, newCarry != 0x00)
+}
+
+/////////////////
+
+// LD [n16], SP TODO
+func (cpu *CPU) ldmemn16sp() {
+	sp := cpu.Registers.SP
+	n16 := cpu.getImmediate16()
+	addr := cpu.memoryRead(n16)
+	//addr2 := cpu.memoryRead(n16 + 1)
+	value := sp & 0xFF
+	value2 := sp >> 8
+	cpu.memoryWrite(uint16(addr), uint8(value))
+	cpu.memoryWrite(uint16(addr+1), uint8(value2))
+}
+
+// LD HL, SP+e8
+func (cpu *CPU) ldhlspe8() {
+	e8 := int(cpu.getImmediate8())
+	sp := cpu.Registers.SP
+	value := uint16(int32(e8) + int32(sp))
+	cpu.Registers.setHL(value)
+	cpu.Registers.setFlag(flagZ, false)
+	cpu.Registers.setFlag(flagN, false)
+	halfCarry := ((sp & 0b1111) + (uint16(e8) & 0b1111)) > 0b1111
+	cpu.Registers.setFlag(flagH, halfCarry)
+	carry := ((sp & 0b11111111) + (uint16(e8) & 0b11111111)) > 0b11111111
+	cpu.Registers.setFlag(flagC, carry)
+}
+
+func (cpu *CPU) hldec() {
+	hl := cpu.Registers.getHL()
+	cpu.Registers.setHL(hl - 1)
+}
+
+func (cpu *CPU) hlinc() {
+	hl := cpu.Registers.getHL()
+	cpu.Registers.setHL(hl + 1)
 }
