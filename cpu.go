@@ -13,13 +13,12 @@ var cpulogger log.Logger
 // SP, PC - 16 bit
 // AF, BC, DE, and HL
 type CPU struct {
-	Registers Registers
-	Memory    [65536]uint8
-	timer     Timer
-	Cartridge *Cartridge
-	graphics  *Graphics
-	joypad    *Joypad
-	//OpcodesTable map[string]map[string][]map[string]string
+	Registers    Registers
+	Memory       [65536]uint8
+	timer        Timer
+	Cartridge    *Cartridge
+	graphics     *Graphics
+	joypad       *Joypad
 	IME          bool // interrupt master enable
 	IMEScheduled bool //enable IME after one instr
 	halted       bool
@@ -32,9 +31,6 @@ type CPU struct {
 type Registers struct {
 	A, B, C, D, E, F, H, L uint8
 	SP, PC                 uint16
-
-	// PC- 0x100 init
-	//AF, BC, DE, HL uint16
 }
 
 // flags
@@ -51,14 +47,11 @@ func NewCPU() *CPU {
 	}
 	cpu.IME = false
 
-	//cpu.graphics.cpu = cpu
-
 	return cpu
 
 }
 
 func (register *Registers) setFlag(flag uint8, on bool) {
-	//var register Registers
 	if on {
 		register.F |= flag //set bit
 	} else {
@@ -71,12 +64,10 @@ func (register *Registers) getFlag(flag uint8) bool {
 }
 
 func (register *Registers) getAF() uint16 {
-	//var register Registers
 	return uint16(register.A)<<8 | uint16(register.F)
 }
 
 func (register *Registers) setAF(value uint16) {
-	//var register Registers
 	register.A = uint8(value >> 8)
 	register.F = uint8(value & 0xFF)
 }
@@ -84,13 +75,11 @@ func (register *Registers) setAF(value uint16) {
 // B-hi C-lo
 
 func (register *Registers) getBC() uint16 {
-	//var register Registers
 	//			most significant	least significant
 	return uint16(register.B)<<8 | uint16(register.C)
 }
 
 func (register *Registers) setBC(value uint16) {
-	//var register Registers
 	register.B = uint8(value >> 8)   //take upper bits
 	register.C = uint8(value & 0xFF) // take lower bits
 }
@@ -98,12 +87,10 @@ func (register *Registers) setBC(value uint16) {
 // D-hi E-lo
 
 func (register *Registers) getDE() uint16 {
-	//var register Registers
 	return uint16(register.D)<<8 | uint16(register.E)
 }
 
 func (register *Registers) setDE(value uint16) {
-	//var register Registers
 	register.D = uint8(value >> 8)   //take upper bits
 	register.E = uint8(value & 0xFF) // take lower bits
 }
@@ -111,14 +98,20 @@ func (register *Registers) setDE(value uint16) {
 // H-hi L-lo
 
 func (register *Registers) getHL() uint16 {
-	//var register Registers
 	return uint16(register.H)<<8 | uint16(register.L)
 }
 
 func (register *Registers) setHL(value uint16) {
-	//var register Registers
 	register.H = uint8(value >> 8)   //take upper bits
 	register.L = uint8(value & 0xFF) // take lower bits
+}
+
+func (cpu *CPU) getIE() uint8 {
+	return cpu.memoryRead(0xFFFF)
+}
+
+func (cpu *CPU) getIF() uint8 {
+	return cpu.memoryRead(0xFF0F)
 }
 func (cpu *CPU) checkSchedule() {
 	if cpu.IMEScheduled {
@@ -128,7 +121,6 @@ func (cpu *CPU) checkSchedule() {
 }
 
 func (cpu *CPU) fetchOpcode() uint8 {
-	//opcode := cpu.Memory[cpu.Registers.PC]
 	opcode := cpu.memoryRead(cpu.Registers.PC)
 	if cpu.haltBug {
 		cpu.haltBug = false // PC not incremented
@@ -144,6 +136,8 @@ func (cpu *CPU) push(n uint16) {
 	cpu.Registers.SP -= 1
 
 	cpu.memoryWrite(cpu.Registers.SP, uint8(hi))
+	//cpu.memoryWrite(cpu.Registers.SP, byte(n>>8))
+
 	cpu.Registers.SP -= 1
 	if cpu.Registers.SP == 0xFF80 {
 		panic(cpulogger.Error("Stack smash"))
@@ -154,12 +148,13 @@ func (cpu *CPU) push(n uint16) {
 func (cpu *CPU) pop() uint16 {
 	lo := uint16(cpu.memoryRead(cpu.Registers.SP))
 	hi := uint16(cpu.memoryRead(cpu.Registers.SP + 1))
+	value := hi<<8 | lo
 	cpu.Registers.SP += 2
 
 	if cpu.Registers.SP == 0xFFFE+1 {
 		panic(cpulogger.Error("Stack smash"))
 	}
-	return hi<<8 | lo
+	return value
 }
 
 func (cpu *CPU) handleInterruptions() bool {
@@ -176,8 +171,8 @@ func (cpu *CPU) handleInterruptions() bool {
 	if !cpu.IME {
 		return false
 	}
-	IE := cpu.memoryRead(0xFFFF)
-	IF := cpu.memoryRead(0xFF0F)
+	IE := cpu.getIE()
+	IF := cpu.getIF()
 
 	interruptions := IE & IF
 	if interruptions == 0 {
@@ -218,25 +213,20 @@ func (cpu *CPU) handleInterruptions() bool {
 }
 
 func (cpu *CPU) memoryWrite(address uint16, value byte) {
-	if address == 0xFF00 {
-		//	refs
-		//  https://gbdev.gg8.se/forums/viewtopic.php?id=845
-		//  https://gbdev.io/pandocs/Joypad_Input.html#ff00--p1joyp-joypad
-		//TODO: write just to bits 5,4 for joypad - p1
-		//current := cpu.Memory[address]
-		//cpu.Memory[address] = current&0b11001111 | value&0b00110000
+	if address < 0x8000 {
+		return
+	} else if address == 0xFF00 {
 		cpu.joypad.write(value)
 		cpulogger.Debug(fmt.Sprintf("write in 0xFF00 %08b", cpu.Memory[address]))
 	} else if address == 0xFF89 {
 		cpulogger.Debug(fmt.Sprintf("write in 0xFF89 %08b", value))
 		cpu.Memory[address] = value
-	} else if address == 0x6C60 {
-		cpulogger.Debug(fmt.Sprintf("write in 0x6C60 %x", value))
-		cpu.Memory[address] = value
 	} else if address >= 0xC000 && address <= 0xCFFF {
 		cpu.Memory[address] = value
-		cpu.Memory[address+0x2000] = value // ?
-	} else if address >= 0xE000 && address <= 0xDDFF {
+		if address+0x2000 <= 0xFFFF {
+			cpu.Memory[address+0x2000] = value
+		}
+	} else if address >= 0xE000 && address <= 0xFDFF {
 		cpu.Memory[address] = value
 		cpu.Memory[address-0x2000] = value
 	} else if address >= 0xFF04 && address <= 0xFF07 {
@@ -265,27 +255,39 @@ func (cpu *CPU) memoryRead(address uint16) byte {
 	}
 	return cpu.Memory[address]
 }
+
 func (cpu *CPU) execOpcodes() int {
+	IE := cpu.getIE()
+	IF := cpu.getIF()
 	if cpu.halted {
-		cpu.handleInterruptions()
-		//return 0
+		cpulogger.Debug(fmt.Sprintf("halted with IF: %x and IE: %x", IF, IE))
+		if (IE & IF & 0x1F) != 0 {
+			cpu.halted = false
+		}
 	}
 	if cpu.stopped {
+
+		cpulogger.Debug("stopped")
 		return 0
+	}
+	if cpu.handleInterruptions() {
+		cpulogger.Debug(fmt.Sprintf("interruptions !!1"))
+		return 5
 	}
 	var tCycles int = -1
 	prefix := cpu.fetchOpcode()
 
 	isPrefixed := (prefix == 0xcb)
 	opcode := prefix
-	IE := cpu.memoryRead(0xFFFF)
-	IF := cpu.memoryRead(0xFF0F)
-	cpulogger.Debug(fmt.Sprintf("Executing opcode 0x%x @PC=0x%x A=0x%x F=0x%x DE=0x%x HL=0x%x IE&IF= 0x%0x", opcode, cpu.Registers.PC-1, cpu.Registers.A, cpu.Registers.F, cpu.Registers.getDE(), cpu.Registers.getHL(), IE&IF))
+	if cpu.Registers.getDE() == 0x9a05 {
+		fmt.Println(cpu.Registers.PC - 1)
+		fmt.Println("STOPP")
+	}
+	cpulogger.Debug(fmt.Sprintf("Executing opcode 0x%x @PC=0x%x A=0x%x F=0x%x DE=0x%x HL=0x%x BC=0x%x IE&IF= 0x%0x", opcode, cpu.Registers.PC-1, cpu.Registers.A, cpu.Registers.F, cpu.Registers.getDE(), cpu.Registers.getHL(), cpu.Registers.getBC(), IE&IF))
 	if prefix == 0xcb {
 		// prefixed
 		opcode = cpu.fetchOpcode()
 		cpulogger.Debug(fmt.Sprintf("Executing in cbprefixed opcode 0x%x @PC=0x%x A=0x%x F=0x%x ", opcode, cpu.Registers.PC-1, cpu.Registers.A, cpu.Registers.F))
-		// TODO: ROM01:6C61	cp $00 (fe)-> should be cb before but it's not
 		switch opcode {
 		case 0x37:
 			tCycles = cpu.cbop37()
@@ -772,6 +774,40 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = cpu.cbopfb()
 		case 0xfc:
 			tCycles = cpu.cbopfc()
+		case 0x42:
+			tCycles = cpu.cbop42()
+		case 0x43:
+			tCycles = cpu.cbop43()
+		case 0x44:
+			tCycles = cpu.cbop44()
+		case 0x45:
+			tCycles = cpu.cbop45()
+		case 0x4a:
+			tCycles = cpu.cbop4a()
+		case 0x4b:
+			tCycles = cpu.cbop4b()
+		case 0x4c:
+			tCycles = cpu.cbop4c()
+		case 0x80:
+			tCycles = cpu.cbop80()
+		case 0x82:
+			tCycles = cpu.cbop82()
+		case 0x83:
+			tCycles = cpu.cbop83()
+		case 0x84:
+			tCycles = cpu.cbop84()
+		case 0x85:
+			tCycles = cpu.cbop85()
+		case 0x88:
+			tCycles = cpu.cbop88()
+		case 0x8a:
+			tCycles = cpu.cbop8a()
+		case 0x8b:
+			tCycles = cpu.cbop8b()
+		case 0x8c:
+			tCycles = cpu.cbop8c()
+		case 0x8d:
+			tCycles = cpu.cbop8d()
 
 		default:
 			panic(cpulogger.Error(fmt.Sprintf("[CB] Opcode 0x%x is not implemented. PC=0x%x", opcode, cpu.Registers.PC-1)))
@@ -1107,8 +1143,9 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = cpu.opc4()
 		case 0xdc:
 			tCycles = cpu.opdc()
-		case 0xfc:
-			tCycles = cpu.opfc()
+		case 0x27:
+			tCycles = cpu.op27()
+
 		case 0xff:
 			tCycles = cpu.opff()
 		case 0x1f:
@@ -1232,10 +1269,75 @@ func (cpu *CPU) execOpcodes() int {
 			tCycles = cpu.op4c()
 		case 0x4d:
 			tCycles = cpu.op4d()
+		case 0x5b:
+			tCycles = cpu.op5b()
+		///////////////////////
+		case 0x50:
+			tCycles = cpu.op50()
+		case 0x52:
+			tCycles = cpu.op52()
+		case 0x53:
+			tCycles = cpu.op53()
+		case 0x55:
+			tCycles = cpu.op55()
+		case 0x58:
+			tCycles = cpu.op58()
+		case 0x59:
+			tCycles = cpu.op59()
+		case 0x5a:
+			tCycles = cpu.op5a()
+		case 0x5c:
+			tCycles = cpu.op5c()
+		case 0x63:
+			tCycles = cpu.op63()
+		case 0x64:
+			tCycles = cpu.op64()
+		case 0x65:
+			tCycles = cpu.op65()
+		case 0x68:
+			tCycles = cpu.op68()
+		case 0x6a:
+			tCycles = cpu.op6a()
+		case 0x6d:
+			tCycles = cpu.op6d()
+		case 0xf2:
+			tCycles = cpu.opf2()
+		case 0xc7:
+			tCycles = cpu.opc7()
+		case 0xd7:
+			tCycles = cpu.opd7()
+		case 0xe7:
+			tCycles = cpu.ope7()
+		case 0xf7:
+			tCycles = cpu.opf7()
+		// ILLEGALS
+		case 0xd3:
+			tCycles = cpu.opd3()
+		case 0xdb:
+			tCycles = cpu.opdb()
+		case 0xdd:
+			tCycles = cpu.opdd()
+		case 0xe3:
+			tCycles = cpu.ope3()
+		case 0xe4:
+			tCycles = cpu.ope4()
+		case 0xeb:
+			tCycles = cpu.opeb()
+		case 0xec:
+			tCycles = cpu.opec()
+		case 0xed:
+			tCycles = cpu.oped()
+		case 0xf4:
+			tCycles = cpu.opf4()
+		case 0xfc:
+			tCycles = cpu.opfc()
+		case 0xfd:
+			tCycles = cpu.opfd()
 
 		default:
 			panic(cpulogger.Error(fmt.Sprintf("Opcode 0x%x is not implemented. PC=0x%x", opcode, cpu.Registers.PC-1)))
 		}
+
 	}
 
 	if tCycles < 0 {
@@ -1251,8 +1353,10 @@ func (cpu *CPU) execOpcodes() int {
 
 func (cpu *CPU) loadROMFile(cartridge *Cartridge) {
 	cpu.Cartridge = cartridge
-	copy(cpu.Memory[:], cartridge.ROMdata)
-	//cartridge.bootROM // TODO urgent
+	//copy(cpu.Memory[:], cartridge.ROMdata)
+	copy(cpu.Memory[0x0000:0x8000], cartridge.ROMdata[:0x8000])
+
+	//cartridge.bootROM
 
 	cpu.Registers.PC = 0x100
 	cpu.Registers.setAF(0x01B0)
@@ -1319,12 +1423,11 @@ func (cpu *CPU) frameSteps() {
 	const cyclesPerFrame = 70224
 	cyclesCurrFrame := 0
 	for cyclesCurrFrame < cyclesPerFrame {
-
 		tCycles := cpu.execOpcodes()
 		cpu.graphics.modesHandling(tCycles)
+		cpu.checkSchedule()
 
 		cpu.handleInterruptions()
-		cpu.checkSchedule()
 		cpu.timer.Update(tCycles, cpu)
 		cpu.joypad.UpdateJoypad()
 		cyclesCurrFrame += tCycles

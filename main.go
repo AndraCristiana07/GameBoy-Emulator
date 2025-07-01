@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 	log "github.com/mgutz/logxi/v1"
 )
@@ -13,13 +15,11 @@ var logger log.Logger
 
 func main() {
 	logger = log.New("main")
-
-	//cartridge, err := LoadCartridge("roms/tetris.gb")
-	cartridge, err := LoadCartridge("roms/tetris-recompiled.gb")
-	//cartridge, err := LoadCartridge("roms/Tennis.gb")
-	//cartridge, err := LoadCartridge("roms/gameGB.gba")
-	//cartridge, err := LoadCartridge("roms/Qix.gb")
-	//cartridge, err := LoadCartridge("roms/hello-world.gb")
+	romPath := os.Args[1]
+	if romPath == "" {
+		fmt.Print("No ROM given")
+	}
+	cartridge, err := LoadCartridge(romPath)
 
 	if err != nil {
 		panic(logger.Error("Error loading cartridge:", err))
@@ -29,9 +29,10 @@ func main() {
 	cpu := NewCPU()
 
 	cpu.loadROMFile(cartridge)
+	cpulogger.Debug(fmt.Sprintf("at 0x2000: 0x%x", cpu.Memory[0x2000]))
 
 	logger.Debug("ROM banking ", cpu.Memory[0x0148])
-	if cpu.Memory[0x0148] != 0x0 {
+	if cpu.Memory[0x0147] != 0x0 {
 		panic(logger.Error("No banking supported"))
 	}
 	rl.InitWindow(1500, 500, cartridge.title)
@@ -58,12 +59,9 @@ func main() {
 			continue
 		}
 
-		//cpu.graphics.render()
-
 		drawTiles(&cpu.Memory, 1000, 0)
 		drawTileMap(cpu, 400, 0)
 
-		//cpu.joypad.UpdateJoypad()
 		rl.EndDrawing()
 	}
 

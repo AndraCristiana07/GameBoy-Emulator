@@ -122,7 +122,6 @@ func (cpu *CPU) op31() int {
 	return 12
 }
 
-// skip review pentru ca nu e folosit
 // RST $38
 func (cpu *CPU) opff() int {
 	cpu.call(0x38)
@@ -241,28 +240,24 @@ func (cpu *CPU) opc8() int {
 	return cpu.retcc(cpu.Registers.getFlag(flagZ))
 }
 
-// skip review pentru ca nu e folosit
 // SCF
 func (cpu *CPU) op37() int {
 	cpu.scf()
 	return 4
 }
 
-// skip review pentru ca nu e folosit
 // INC r8 - r8=E
 func (cpu *CPU) op1c() int {
 	cpu.incr8(&cpu.Registers.E)
 	return 4
 }
 
-// skip review pentru ca nu e folosit
 // INC r8 - r8=H
 func (cpu *CPU) op24() int {
 	cpu.incr8(&cpu.Registers.H)
 	return 4
 }
 
-// skip review pentru ca nu e folosit
 // ADD HL, r16 - r16=BC
 func (cpu *CPU) op09() int {
 	cpu.addhlr16(cpu.Registers.getBC)
@@ -398,6 +393,8 @@ func (cpu *CPU) op19() int {
 	cpu.addhlr16(cpu.Registers.getDE)
 	return 8
 }
+
+// /////// review 3 end
 
 // LD r8, [HL] - r8=E
 func (cpu *CPU) op5e() int {
@@ -638,6 +635,30 @@ func (cpu *CPU) op6c() int {
 func (cpu *CPU) opf9() int {
 	cpu.ldsphl()
 	return 8
+}
+
+// RST $00
+func (cpu *CPU) opc7() int {
+	cpu.call(0x00)
+	return 16
+}
+
+// RST $10
+func (cpu *CPU) opd7() int {
+	cpu.call(0x10)
+	return 16
+}
+
+// RST $20
+func (cpu *CPU) ope7() int {
+	cpu.call(0x20)
+	return 16
+}
+
+// RST $30
+func (cpu *CPU) opf7() int {
+	cpu.call(0x30)
+	return 16
 }
 
 // RST $08
@@ -1240,6 +1261,56 @@ func (cpu *CPU) opfc() int {
 	return 4
 }
 
+// ILLEGAL
+func (cpu *CPU) opd3() int {
+	return 4
+}
+
+// ILLEGAL
+func (cpu *CPU) opdb() int {
+	return 4
+}
+
+// ILLEGAL
+func (cpu *CPU) opdd() int {
+	return 4
+}
+
+// ILLEGAL
+func (cpu *CPU) ope3() int {
+	return 4
+}
+
+// ILLEGAL
+func (cpu *CPU) ope4() int {
+	return 4
+}
+
+// ILLEGAL
+func (cpu *CPU) opeb() int {
+	return 4
+}
+
+// ILLEGAL
+func (cpu *CPU) opec() int {
+	return 4
+}
+
+// ILLEGAL
+func (cpu *CPU) oped() int {
+	return 4
+}
+
+// ILLEGAL
+func (cpu *CPU) opf4() int {
+	return 4
+}
+
+// ILLEGAL
+func (cpu *CPU) opfd() int {
+	return 4
+}
+
 // CALL cc - cc=NC
 func (cpu *CPU) opd4() int {
 	return cpu.callcca16(!cpu.Registers.getFlag(flagC))
@@ -1357,6 +1428,108 @@ func (cpu *CPU) op4c() int {
 func (cpu *CPU) op4d() int {
 	cpu.ldr8r8(&cpu.Registers.C, cpu.Registers.L)
 	return 4
+}
+
+// LD r8,r8 - r8=E,E
+func (cpu *CPU) op5b() int {
+	cpu.ldr8r8(&cpu.Registers.E, cpu.Registers.E)
+	return 4
+}
+
+// DAA
+func (cpu *CPU) op27() int {
+	cpu.daa()
+	return 4
+}
+
+// LD r8,r8 - r8=D,B
+func (cpu *CPU) op50() int {
+	cpu.ldr8r8(&cpu.Registers.D, cpu.Registers.B)
+	return 4
+}
+
+// LD r8,r8 - r8=D,D
+func (cpu *CPU) op52() int {
+	cpu.ldr8r8(&cpu.Registers.D, cpu.Registers.D)
+	return 4
+}
+
+// LD r8,r8 - r8=D,E
+func (cpu *CPU) op53() int {
+	cpu.ldr8r8(&cpu.Registers.D, cpu.Registers.E)
+	return 4
+}
+
+// LD r8,r8 - r8=E,B
+func (cpu *CPU) op58() int {
+	cpu.ldr8r8(&cpu.Registers.E, cpu.Registers.B)
+	return 4
+}
+
+// LD r8,r8 - r8=D,L
+func (cpu *CPU) op55() int {
+	cpu.ldr8r8(&cpu.Registers.D, cpu.Registers.L)
+	return 4
+}
+
+// LD r8,r8 - r8=E,C
+func (cpu *CPU) op59() int {
+	cpu.ldr8r8(&cpu.Registers.E, cpu.Registers.C)
+	return 4
+}
+
+// LD r8,r8 - r8=E,D
+func (cpu *CPU) op5a() int {
+	cpu.ldr8r8(&cpu.Registers.E, cpu.Registers.D)
+	return 4
+}
+
+// LD r8,r8 - r8=E,H
+func (cpu *CPU) op5c() int {
+	cpu.ldr8r8(&cpu.Registers.E, cpu.Registers.H)
+	return 4
+}
+
+// LD r8,r8 - r8=H,E
+func (cpu *CPU) op63() int {
+	cpu.ldr8r8(&cpu.Registers.H, cpu.Registers.E)
+	return 4
+}
+
+// LD r8,r8 - r8=H,H
+func (cpu *CPU) op64() int {
+	cpu.ldr8r8(&cpu.Registers.H, cpu.Registers.H)
+	return 4
+}
+
+// LD r8,r8 - r8=H,L
+func (cpu *CPU) op65() int {
+	cpu.ldr8r8(&cpu.Registers.H, cpu.Registers.L)
+	return 4
+}
+
+// LD r8,r8 - r8=L, B
+func (cpu *CPU) op68() int {
+	cpu.ldr8r8(&cpu.Registers.L, cpu.Registers.B)
+	return 4
+}
+
+// LD r8,r8 - r8=L, D
+func (cpu *CPU) op6a() int {
+	cpu.ldr8r8(&cpu.Registers.L, cpu.Registers.D)
+	return 4
+}
+
+// LD r8,r8 - r8=L, L
+func (cpu *CPU) op6d() int {
+	cpu.ldr8r8(&cpu.Registers.L, cpu.Registers.L)
+	return 4
+}
+
+// LDH A, [C]
+func (cpu *CPU) opf2() int {
+	cpu.ldhamemc()
+	return 8
 }
 
 // ///// generated

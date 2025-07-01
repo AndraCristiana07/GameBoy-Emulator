@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"sort"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 	log "github.com/mgutz/logxi/v1"
-	"sort"
 )
 
 var gpulogger log.Logger
@@ -59,8 +60,9 @@ type Graphics struct {
 	//pixelBuffer [height][width]uint8
 	pixelBuffer [height][width]uint8
 
-	drawnLine bool
-	cycle     int
+	drawnLine       bool
+	cycle           int
+	vblankTriggered bool
 }
 
 // Priority: 0 = No, 1 = BG and Window colors 1–3 are drawn over this OBJ
@@ -316,14 +318,12 @@ func (graphic *Graphics) getBackground() [height][width]uint8 {
 	scy := int(graphic.getSCY())
 	//ly := int(graphic.getLY())
 	lcdc := graphic.getLCDC()
-	// gpulogger.Debug(fmt.Sprintf("lcdc 0b%08b", lcdc))
 
 	bgTileMapBase := uint16(0x9800)
 	if (lcdc & (1 << 3)) != 0 {
 		bgTileMapBase = 0x9C00
 	}
 
-	// gpulogger.Debug(fmt.Sprintf("BG TileMapBase: 0x%04X\n", bgTileMapBase))
 	for ly := 0; ly < height; ly++ {
 
 		for screenX := 0; screenX < width; screenX++ {
@@ -345,7 +345,6 @@ func (graphic *Graphics) getBackground() [height][width]uint8 {
 
 				tileAddress = 0x9000 + int(int8(tileIndex))*16
 			}
-			// gpulogger.Debug(fmt.Sprintf(" tileAddress: 0x%04X", tileAddress))
 
 			tilePixelX := bgX % 8
 			tilePixelY := bgY % 8
@@ -411,10 +410,7 @@ func (graphic *Graphics) getWindow() [height][width]uint8 {
 			tileX := winX % 8
 
 			colorID := graphic.getTilePixel(uint16(tileAddr), tileX, tileY)
-			//BGP Palette
-			//palette := graphic.cpu.Memory[0xFF47]
-			//shade := (palette >> (colorID * 2)) & 0x03
-			//window[screenY][screenX] = shade
+
 			window[screenY][screenX] = colorID
 		}
 	}
@@ -422,14 +418,12 @@ func (graphic *Graphics) getWindow() [height][width]uint8 {
 }
 
 func (graphic *Graphics) renderScanline() {
-	// gpulogger.Debug("In render scanline")
 	ly := graphic.getLY()
 	lcdc := graphic.getLCDC()
 
 	if int(ly) >= height {
 		return
 	}
-	//graphic.cpu.Memory[0xFF40] = 0b10010001
 	bgPixels := graphic.getBackground()
 	winPixels := graphic.getWindow()
 	spritePixels := graphic.spritesOAM()
@@ -449,15 +443,11 @@ func (graphic *Graphics) renderScanline() {
 		}
 		if lcdc&(1<<1) != 0 {
 			spritePixel := spritePixels[ly][screenX]
-			//spritePrio := spritePriority[ly][screenX]
 			if spritePixel != 255 && spritePixel != 0 {
-				//if !spritePrio || pixel == 0{}
 				pixel = spritePixel
 			}
 		}
-		//color := colors[pixel]
 		graphic.pixelBuffer[ly][screenX] = pixel
-		// gpulogger.Debug(fmt.Sprintf("pixel: %d, color of pixel: %d\n", pixel, color)
 
 		x := screenX
 		y := int(ly)
@@ -480,8 +470,6 @@ func (graphic *Graphics) drawScreen() {
 }
 
 func (graphic *Graphics) modesHandling(tCycles int) {
-	// gpulogger.Debug("mode handling")
-	// gpulogger.Debug(fmt.Sprintf("LCDC: 0b%08b\n", graphic.getLCDC()))
 	if graphic.cpu == nil {
 		// gpulogger.Debug("Error: graphics.cpu is nil")
 		return
@@ -490,7 +478,6 @@ func (graphic *Graphics) modesHandling(tCycles int) {
 	lcdc := graphic.getLCDC()
 
 	if lcdc&(1<<7) == 0 {
-		// gpulogger.Debug("LCD Disabled!")
 		graphic.setMode(MODE_HBLANK)
 		graphic.cycle = 0
 		graphic.cpu.Memory[0xFF44] = 0 //reset
@@ -501,122 +488,36 @@ func (graphic *Graphics) modesHandling(tCycles int) {
 	if int(ly) >= SCANLINES_PER_FRAME {
 		graphic.setMode(MODE_VBLANK)
 		if ly == SCANLINES_PER_FRAME {
+
 			IF := graphic.cpu.Memory[0xFF0F] | 1<<0
 			graphic.cpu.memoryWrite(0xFF0F, IF)
 		}
 	} else {
-		//if graphic.cycle >= 456-80 {
-		//if graphic.cycle < 80 {
-		//	graphic.setMode(MODE_OAMSCAN)
-		//
-		//	//} else if graphic.cycle >= 456-80-172 {
-		////} else if graphic.cycle < 80+172 {
-		//	graphic.setMode(MODE_DRAWING)
-
 		if !graphic.drawnLine {
 			graphic.renderScanline()
 			//graphic.generatePixels()
 			graphic.drawnLine = true
 		}
-		//} else {
-		//	graphic.setMode(MODE_HBLANK)
-		//
-		//}
-
 	}
 	if graphic.cycle >= CYCLES_PER_LINE {
 		graphic.cycle -= CYCLES_PER_LINE
 		graphic.drawnLine = false
 
-		// gpulogger.Debug(fmt.Sprintf("ly inc to : %d", graphic.getLY()+1))
 		graphic.cpu.Memory[0xFF44]++
 
 		if graphic.getLY() >= TOTAL_LINES-1 {
 			graphic.cpu.Memory[0xFF44] = 0
 
 			graphic.cycle = 0
-
 			gpulogger.Debug("reset ly, start new frame")
 		}
 	}
-	//graphic.cpu.Memory[0xFF44] = (graphic.cpu.Memory[0xFF44] + 1) % 154
-	// gpulogger.Debug(fmt.Sprintf("LY: %d Cycles: %d mode: %d  \n", graphic.getLY(), graphic.cycle, PPUmode)
 }
-
-//func (graphic *Graphics) modesHandling(tCycles int) {
-//	if graphic.cpu == nil {
-//		return
-//	}
-//
-//	lcdc := graphic.getLCDC()
-//
-//	if lcdc&(1<<7) == 0 {
-//		// LCD disabled
-//		graphic.setMode(MODE_HBLANK)
-//		graphic.cycle = 0
-//		graphic.cpu.Memory[0xFF44] = 0 // reset LY
-//		return
-//	}
-//
-//	graphic.cycle += tCycles
-//	ly := graphic.getLY()
-//
-//	switch graphic.getMode() {
-//	case MODE_OAMSCAN:
-//		if graphic.cycle >= 80 {
-//			graphic.cycle -= 80
-//			graphic.setMode(MODE_DRAWING)
-//		}
-//
-//	case MODE_DRAWING:
-//		if graphic.cycle >= 172 {
-//			graphic.cycle -= 172
-//			// drawing scanline
-//			graphic.renderScanline()
-//			graphic.setMode(MODE_HBLANK)
-//		}
-//
-//	case MODE_HBLANK:
-//		if graphic.cycle >= 204 {
-//			graphic.cycle -= 204
-//			graphic.cpu.Memory[0xFF44]++ // LY
-//			ly = graphic.getLY()
-//
-//			if ly == 144 {
-//				// Enter VBlank
-//				graphic.setMode(MODE_VBLANK)
-//
-//				// VBlank interrupt
-//				interrupt := graphic.cpu.Memory[0xFF0F]
-//				interrupt |= 1 << 0
-//				graphic.cpu.memoryWrite(0xFF0F, interrupt)
-//
-//				graphic.drawnLine = true
-//			} else {
-//				graphic.setMode(MODE_OAMSCAN)
-//			}
-//		}
-//
-//	case MODE_VBLANK:
-//		if graphic.cycle >= 456 {
-//			graphic.cycle -= 456
-//			graphic.cpu.Memory[0xFF44]++
-//			ly = graphic.getLY()
-//
-//			if ly > 153 {
-//				//restart frame
-//				graphic.cpu.Memory[0xFF44] = 0
-//				graphic.setMode(MODE_OAMSCAN)
-//			}
-//		}
-//	}
-//}
 
 func (graphic *Graphics) setMode(mode uint8) {
 	stat := graphic.getSTAT()
 	//		   clear bit         mask last 2 bits
 	stat = (stat &^ 0b00000011) | (mode & 0b00000011)
-	//stat = (stat & 0b11111100) | (mode & 0b00000011)
 
 	graphic.cpu.memoryWrite(0xFF41, stat)
 
@@ -642,9 +543,7 @@ func drawTiles(mem *[65536]uint8, startX int, startY int) {
 		screenBaseY := startY + tileY*tileHeight*scale
 
 		offset := 0x8000 + tileIdx*tileBytes
-		//if offset+16 > 0x1800 {
-		//	gpulogger.Error("Am iesit din vram")
-		//}
+
 		tile := (*mem)[offset : offset+16]
 
 		drawSingleTile(tile, scale, screenBaseX, screenBaseY)
@@ -693,7 +592,6 @@ func drawSprites(oam []uint8, vram []uint8, startX int, startY int) {
 					gpulogger.Debug("transparent")
 					continue
 				}
-				//offset := 500
 
 				rl.DrawRectangle(int32((startX+x+tx)*scale), int32((startY+y+ty)*scale), int32(scale), int32(scale), rl.Red)
 
@@ -823,26 +721,21 @@ func (graphic *Graphics) generatePixels() {
 			if lcdc&(1<<0) != 0 {
 				pixel = bgPixels[ly][screenX]
 				// window overrides background
-				//if lcdc&(1<<5) != 0 && winPixels[ly][screenX] != 0 {
 				if lcdc&(1<<5) != 0 {
 					pixel = winPixels[ly][screenX]
 				}
 			}
 
 			//sprites override
-			//if lcdc&(1<<1) != 0 && spritePixels[ly][screenX] != 255 {
 			if lcdc&(1<<1) != 0 {
 				spriteCol := spritePixels[ly][screenX]
 				if spriteCol != 255 {
 					pixel = spriteCol
 				}
-				//pixel = spritePixels[ly][screenX]
 			}
 			graphic.pixelBuffer[ly][screenX] = pixel
 		}
 	}
-
-	//graphic.drawScreen()
 
 }
 

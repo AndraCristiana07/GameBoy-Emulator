@@ -1,9 +1,13 @@
 
+ifeq ($(ROM),)
+$(error No ROM given)
+endif
+
 run:
-	LOGXI=* go run main.go gpu.go cpu.go parseRom.go timer.go cpu_common.go cpu_ops.go
+	LOGXI=* go run main.go gpu.go cpu.go parseRom.go timer.go cpu_common.go cpu_ops.go joypad.go $(ROM)
 
 release:
-	go run main.go gpu.go cpu.go parseRom.go timer.go cpu_common.go cpu_ops.go
+	go run main.go gpu.go cpu.go parseRom.go timer.go cpu_common.go cpu_ops.go joypad.go $(ROM)
 
 
 unittest:
