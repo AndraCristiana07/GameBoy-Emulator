@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 )
 
@@ -68,15 +69,15 @@ func getRAMSize(size uint8) int {
 }
 
 func (cartridge *Cartridge) printInfo() {
-	// fmt.Printf("Cartridge info:\n")
-	// fmt.Printf("Title: %s\n", cartridge.title)
-	// fmt.Printf("CCB Flag: %d\n", cartridge.CCBFlag)
-	// fmt.Printf("Cartridge type: %d\n", cartridge.cartridgeType)
-	// fmt.Printf("ROM Size: %d KB\n", getROMSize(cartridge.RAMSize)/1024)
-	// fmt.Printf("RAM size: %d KB\n", getRAMSize(cartridge.RAMSize)/1024)
-	// fmt.Printf("Destination code: 0x%d\n", cartridge.destCode)
-	// fmt.Printf("New licensee code: 0x%d\n", cartridge.newLicenseeCode)
-	// fmt.Printf("SGB Flag: %d\n", cartridge.SGBFlag)
-	// fmt.Printf("Checksum: 0x%d\n", cartridge.checksum)
-	// fmt.Printf("Global Checksum: 0x%d\n", cartridge.globalChecksum)
+	fmt.Printf("Cartridge info:\n")
+	fmt.Printf("Title: %s\n", cartridge.title)
+	fmt.Printf("CCB Flag: %d\n", cartridge.CCBFlag)
+	fmt.Printf("Cartridge type: %d\n", cartridge.cartridgeType)
+	fmt.Printf("ROM Size: %d KB\n", getROMSize(cartridge.RAMSize)/1024)
+	fmt.Printf("RAM size: %d KB\n", getRAMSize(cartridge.RAMSize)/1024)
+	fmt.Printf("Destination code: 0x%d\n", cartridge.destCode)
+	fmt.Printf("New licensee code: 0x%d\n", cartridge.newLicenseeCode)
+	fmt.Printf("SGB Flag: %d\n", cartridge.SGBFlag)
+	fmt.Printf("Checksum: 0x%d\n", cartridge.checksum)
+	fmt.Printf("Global Checksum: 0x%d\n", cartridge.globalChecksum)
 }

@@ -35,19 +35,19 @@ func (j *Joypad) read() uint8 {
 	if j.selectButtons {
 		result &^= 0b00100000
 
-		if j.buttons.A == false {
+		if !j.buttons.A {
 			result |= 0b00000001
 		}
 
-		if j.buttons.B == false {
+		if !j.buttons.B {
 			result |= 0b00000010
 		}
 
-		if j.buttons.Select == false {
+		if !j.buttons.Select {
 			result |= 0b00000100
 		}
 
-		if j.buttons.Start == false {
+		if !j.buttons.Start {
 			result |= 0b00001000
 		}
 
@@ -66,16 +66,16 @@ func (j *Joypad) read() uint8 {
 	}
 	if j.selectDpad {
 		result &^= 0b00010000
-		if j.buttons.Right == false {
+		if !j.buttons.Right {
 			result |= 0b00000001
 		}
-		if j.buttons.Left == false {
+		if !j.buttons.Left {
 			result |= 0b00000010
 		}
-		if j.buttons.Up == false {
+		if !j.buttons.Up {
 			result |= 0b00000100
 		}
-		if j.buttons.Down == false {
+		if !j.buttons.Down {
 			result |= 0b00001000
 		}
 

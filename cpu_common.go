@@ -897,9 +897,11 @@ func (cpu *CPU) adcamemhl() {
 
 // CCF
 func (cpu *CPU) ccf() {
-	carry := true
+	var carry bool
 	if cpu.Registers.getFlag(flagC) {
 		carry = false
+	} else {
+		carry = true
 	}
 	cpu.Registers.setFlag(flagC, carry)
 	cpu.Registers.setFlag(flagN, false)

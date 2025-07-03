@@ -133,6 +133,8 @@ func (cpu *CPU) fetchOpcode() uint8 {
 func (cpu *CPU) push(n uint16) {
 	hi := (n & 0xFF00) >> 8
 	lo := n & 0xFF
+	// hi := n >> 8
+	// lo := n
 	cpu.Registers.SP -= 1
 
 	cpu.memoryWrite(cpu.Registers.SP, uint8(hi))
@@ -213,24 +215,27 @@ func (cpu *CPU) handleInterruptions() bool {
 }
 
 func (cpu *CPU) memoryWrite(address uint16, value byte) {
-	if address < 0x8000 {
-		return
-	} else if address == 0xFF00 {
+	if address == 0xFF00 {
 		cpu.joypad.write(value)
 		cpulogger.Debug(fmt.Sprintf("write in 0xFF00 %08b", cpu.Memory[address]))
+	} else if address >= 0xFF04 && address <= 0xFF07 {
+		cpu.timer.Write(address, value)
+	} else if address == 0xFF46 {
+		cpu.Memory[address] = value
+		cpu.dmaTransfer(value)
 	} else if address == 0xFF89 {
 		cpulogger.Debug(fmt.Sprintf("write in 0xFF89 %08b", value))
 		cpu.Memory[address] = value
 	} else if address >= 0xC000 && address <= 0xCFFF {
 		cpu.Memory[address] = value
-		if address+0x2000 <= 0xFFFF {
-			cpu.Memory[address+0x2000] = value
-		}
+		// if address+0x2000 <= 0xFFFF {
+		cpu.Memory[address+0x2000] = value
+		// }
 	} else if address >= 0xE000 && address <= 0xFDFF {
 		cpu.Memory[address] = value
 		cpu.Memory[address-0x2000] = value
-	} else if address >= 0xFF04 && address <= 0xFF07 {
-		cpu.timer.Write(address, value)
+	} else if address >= 0xFEA0 && address <= 0xFEFF {
+		return
 	} else if address >= VRAM_START && address <= VRAM_END {
 		//cpu.graphics.writeVRAM(address, value)
 		cpu.Memory[address] = value
@@ -239,12 +244,11 @@ func (cpu *CPU) memoryWrite(address uint16, value byte) {
 			logger.Debug(fmt.Sprintf("write in 0xFE00 %08b", value))
 		}
 		cpu.Memory[address] = value
-	} else if address == 0xFF46 {
-		cpu.Memory[address] = value
-		cpu.dmaTransfer(value)
 	} else if address == 0xFF40 {
 		cpulogger.Debug(fmt.Sprintf("!!LCDC WRITE: 0x%02X\n", value))
 		cpu.Memory[address] = value
+	} else if address < 0x8000 {
+		return
 	} else {
 		cpu.Memory[address] = value
 	}
@@ -252,8 +256,12 @@ func (cpu *CPU) memoryWrite(address uint16, value byte) {
 func (cpu *CPU) memoryRead(address uint16) byte {
 	if address == 0xFF00 {
 		return cpu.joypad.read()
+	} else if address >= 0xFEA0 && address <= 0xFEFF {
+		return 0xFF //TODO : idk
+	} else {
+		return cpu.Memory[address]
 	}
-	return cpu.Memory[address]
+
 }
 
 func (cpu *CPU) execOpcodes() int {
@@ -271,10 +279,10 @@ func (cpu *CPU) execOpcodes() int {
 		return 0
 	}
 	if cpu.handleInterruptions() {
-		cpulogger.Debug(fmt.Sprintf("interruptions !!1"))
+		cpulogger.Debug("interruptions !!1")
 		return 5
 	}
-	var tCycles int = -1
+	var tCycles = -1
 	prefix := cpu.fetchOpcode()
 
 	isPrefixed := (prefix == 0xcb)
@@ -1413,6 +1421,8 @@ func (cpu *CPU) loadROMFile(cartridge *Cartridge) {
 	cpu.Memory[0xFF47] = 0xFC //BGP
 	cpu.Memory[0xFF48] = 0xFF //OBP0
 	cpu.Memory[0xFF49] = 0xFF // OBP1
+
+	cpu.Memory[0xFF50] = 0x00 // BOOT ROM OFF
 
 	cpu.Memory[0xFF4A] = 0x00 // WY
 	cpu.Memory[0xFF4B] = 0x00 // WX

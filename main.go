@@ -8,8 +8,8 @@ import (
 	log "github.com/mgutz/logxi/v1"
 )
 
-const screenWidth = 160
-const screenHeight = 144
+// const screenWidth = 160
+// const screenHeight = 144
 
 var logger log.Logger
 

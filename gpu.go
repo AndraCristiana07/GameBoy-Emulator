@@ -13,8 +13,8 @@ var gpulogger log.Logger
 const width = 160
 const height = 144
 
-const bgWidth = 256
-const bgHeight = 256
+// const bgWidth = 256
+// const bgHeight = 256
 
 const VRAM_START = 0x8000
 const VRAM_END = 0x9FFF
@@ -39,15 +39,15 @@ var colors = [4]rl.Color{rl.White, rl.LightGray, rl.DarkGray, rl.Black}
 
 type TilePixelID uint8
 
-const (
-	zero TilePixelID = iota
-	one
-	two
-	three
-)
+// const (
+// 	zero TilePixelID = iota
+// 	one
+// 	two
+// 	three
+// )
 
 // tile = array of 8 rows where a row is an array of 8 TileValues
-type tile = [8][8]uint8
+// type tile = [8][8]uint8
 
 type Sprite struct {
 	x, y       int
@@ -60,9 +60,9 @@ type Graphics struct {
 	//pixelBuffer [height][width]uint8
 	pixelBuffer [height][width]uint8
 
-	drawnLine       bool
-	cycle           int
-	vblankTriggered bool
+	drawnLine bool
+	cycle     int
+	// vblankTriggered bool
 }
 
 // Priority: 0 = No, 1 = BG and Window colors 1–3 are drawn over this OBJ
@@ -114,11 +114,13 @@ func (cpu *CPU) dmaTransfer(value uint8) {
 		gpulogger.Debug(fmt.Sprintf("upper with i is 0x%02X", upper+uint16(i)))
 
 		gpulogger.Debug(fmt.Sprintf("OAM at 0x%02X will be: 0x%02X", OAM_START+uint16(i), cpu.Memory[upper+uint16(i)]))
-		if OAM_START+uint16(i) == 0xFE00 {
-			logger.Debug(fmt.Sprintf("write in 0xFE00 %08b", value))
+		// if OAM_START+uint16(i) == 0xFE00 {
+		// 	logger.Debug(fmt.Sprintf("write in 0xFE00 %08b", value))
 
-		}
-		cpu.Memory[OAM_START+uint16(i)] = cpu.Memory[upper+uint16(i)]
+		// }
+		// cpu.Memory[OAM_START+uint16(i)] = cpu.Memory[upper+uint16(i)]
+		cpu.Memory[OAM_START+uint16(i)] = (cpu.memoryRead(upper + uint16(i)))
+
 		gpulogger.Debug(fmt.Sprintf("DMA Transfer ->  %04X - %02X %04X- with DE=%04X  %04X, with upper+i %04X and in memory %04X\n ", i, cpu.Memory[i], value, cpu.Registers.getDE(), cpu.Memory[value], upper+uint16(i), cpu.Memory[upper+uint16(i)]))
 
 	}
@@ -280,7 +282,7 @@ func (graphic *Graphics) spritesOAM() [height][width]uint8 {
 			screenY := ly
 
 			// check bounds
-			if screenX < 0 || screenY < 0 || screenX >= width || screenY >= height {
+			if screenX < 0 || screenX >= width || screenY >= height {
 				continue
 			}
 
@@ -410,7 +412,10 @@ func (graphic *Graphics) getWindow() [height][width]uint8 {
 			tileX := winX % 8
 
 			colorID := graphic.getTilePixel(uint16(tileAddr), tileX, tileY)
-
+			//BGP Palette
+			//palette := graphic.cpu.Memory[0xFF47]
+			//shade := (palette >> (colorID * 2)) & 0x03
+			//window[screenY][screenX] = shade
 			window[screenY][screenX] = colorID
 		}
 	}
@@ -458,16 +463,16 @@ func (graphic *Graphics) renderScanline() {
 	}
 }
 
-func (graphic *Graphics) drawScreen() {
-	scale := 2
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			colorIdx := graphic.pixelBuffer[y][x]
-			color := colors[colorIdx]
-			rl.DrawRectangle(int32(x*scale), int32(y*scale), int32(scale), int32(scale), color)
-		}
-	}
-}
+// func (graphic *Graphics) drawScreen() {
+// 	scale := 2
+// 	for y := 0; y < height; y++ {
+// 		for x := 0; x < width; x++ {
+// 			colorIdx := graphic.pixelBuffer[y][x]
+// 			color := colors[colorIdx]
+// 			rl.DrawRectangle(int32(x*scale), int32(y*scale), int32(scale), int32(scale), color)
+// 		}
+// 	}
+// }
 
 func (graphic *Graphics) modesHandling(tCycles int) {
 	if graphic.cpu == nil {
@@ -523,9 +528,9 @@ func (graphic *Graphics) setMode(mode uint8) {
 
 }
 
-func (graphic *Graphics) getMode() uint8 {
-	return graphic.cpu.memoryRead(0xFF41) & 0b00000011
-}
+// func (graphic *Graphics) getMode() uint8 {
+// 	return graphic.cpu.memoryRead(0xFF41) & 0b00000011
+// }
 
 func drawTiles(mem *[65536]uint8, startX int, startY int) {
 	tileWidth := 8
@@ -550,56 +555,56 @@ func drawTiles(mem *[65536]uint8, startX int, startY int) {
 	}
 }
 
-func drawSprites(oam []uint8, vram []uint8, startX int, startY int) {
-	spriteCount := 40
-	spriteWidth := 8
-	spriteHeight := 8
-	scale := 2
+// func drawSprites(oam []uint8, vram []uint8, startX int, startY int) {
+// 	spriteCount := 40
+// 	spriteWidth := 8
+// 	spriteHeight := 8
+// 	scale := 2
 
-	for i := 0; i < spriteCount; i++ {
-		spriteAddr := i * 4
-		y := int(oam[spriteAddr]) - 16
-		x := int(oam[spriteAddr+1]) - 8
-		tileIndex := int(oam[spriteAddr+2])
-		//attributes := int(oam[spriteAddr+3])
+// 	for i := 0; i < spriteCount; i++ {
+// 		spriteAddr := i * 4
+// 		y := int(oam[spriteAddr]) - 16
+// 		x := int(oam[spriteAddr+1]) - 8
+// 		tileIndex := int(oam[spriteAddr+2])
+// 		//attributes := int(oam[spriteAddr+3])
 
-		if tileIndex*16+16 > len(vram) {
-			gpulogger.Debug(fmt.Sprintf("Draw sprites - INVALID"))
-			continue
-		}
-		if tileIndex < 0 || tileIndex >= 384 {
-			gpulogger.Debug(fmt.Sprintf("Draw sprites - out of bounds"))
-			continue
-		}
+// 		if tileIndex*16+16 > len(vram) {
+// 			gpulogger.Debug(fmt.Sprintf("Draw sprites - INVALID"))
+// 			continue
+// 		}
+// 		if tileIndex < 0 || tileIndex >= 384 {
+// 			gpulogger.Debug(fmt.Sprintf("Draw sprites - out of bounds"))
+// 			continue
+// 		}
 
-		tileStart := tileIndex * 16
-		if tileStart+16 > len(vram) {
-			gpulogger.Debug(fmt.Sprintf("Draw sprites - out of vrqm bounds"))
-			continue
-		}
+// 		tileStart := tileIndex * 16
+// 		if tileStart+16 > len(vram) {
+// 			gpulogger.Debug(fmt.Sprintf("Draw sprites - out of vrqm bounds"))
+// 			continue
+// 		}
 
-		tileData := vram[tileStart : tileStart+16]
+// 		tileData := vram[tileStart : tileStart+16]
 
-		for ty := 0; ty < spriteHeight; ty++ {
-			low := tileData[ty*2]
-			high := tileData[ty*2+1]
-			for tx := 0; tx < spriteWidth; tx++ {
-				bit := 7 - tx
-				msbLow := (low >> bit) & 1
-				msbHigh := (high >> bit) & 1
-				colorId := (msbHigh << 1) | msbLow
-				if colorId == 0 {
-					gpulogger.Debug("transparent")
-					continue
-				}
+// 		for ty := 0; ty < spriteHeight; ty++ {
+// 			low := tileData[ty*2]
+// 			high := tileData[ty*2+1]
+// 			for tx := 0; tx < spriteWidth; tx++ {
+// 				bit := 7 - tx
+// 				msbLow := (low >> bit) & 1
+// 				msbHigh := (high >> bit) & 1
+// 				colorId := (msbHigh << 1) | msbLow
+// 				if colorId == 0 {
+// 					gpulogger.Debug("transparent")
+// 					continue
+// 				}
 
-				rl.DrawRectangle(int32((startX+x+tx)*scale), int32((startY+y+ty)*scale), int32(scale), int32(scale), rl.Red)
+// 				rl.DrawRectangle(int32((startX+x+tx)*scale), int32((startY+y+ty)*scale), int32(scale), int32(scale), rl.Red)
 
-			}
-		}
+// 			}
+// 		}
 
-	}
-}
+// 	}
+// }
 
 func drawSingleTile(tile []uint8, scale int, tx int, ty int) {
 	tileHeight := 8
@@ -672,7 +677,7 @@ func drawTileMap(cpu *CPU, startX int, startY int) {
 			var tileAddr = tileBase + int(tileIndex)*16
 
 			if tileAddr < 0 || tileAddr+16 > len(*mem) {
-				panic(gpulogger.Error(fmt.Sprintf("Draw tile map - INVALID")))
+				panic(gpulogger.Error("Draw tile map - INVALID"))
 			}
 
 			tileData := (*mem)[tileAddr : tileAddr+16]
@@ -685,61 +690,61 @@ func drawTileMap(cpu *CPU, startX int, startY int) {
 	}
 }
 
-func (graphic *Graphics) drawBackground() {
-	scale := 2
-	bgPixels := graphic.getBackground()
-	for ly := 0; ly < height; ly++ {
-		for screenX := 0; screenX < width; screenX++ {
-			pixel := bgPixels[ly][screenX]
-			rl.DrawRectangle(int32(screenX*scale), int32(ly*scale), int32(scale), int32(scale), colors[pixel])
-		}
-	}
-}
+// func (graphic *Graphics) drawBackground() {
+// 	scale := 2
+// 	bgPixels := graphic.getBackground()
+// 	for ly := 0; ly < height; ly++ {
+// 		for screenX := 0; screenX < width; screenX++ {
+// 			pixel := bgPixels[ly][screenX]
+// 			rl.DrawRectangle(int32(screenX*scale), int32(ly*scale), int32(scale), int32(scale), colors[pixel])
+// 		}
+// 	}
+// }
 
-func (graphic *Graphics) drawWindow() {
-	scale := 2
-	winPixels := graphic.getWindow()
-	for ly := 0; ly < height; ly++ {
-		for screenX := 0; screenX < width; screenX++ {
-			pixel := winPixels[ly][screenX]
-			rl.DrawRectangle(int32(screenX*scale), int32(ly*scale), int32(scale), int32(scale), colors[pixel])
-		}
-	}
-}
+// func (graphic *Graphics) drawWindow() {
+// 	scale := 2
+// 	winPixels := graphic.getWindow()
+// 	for ly := 0; ly < height; ly++ {
+// 		for screenX := 0; screenX < width; screenX++ {
+// 			pixel := winPixels[ly][screenX]
+// 			rl.DrawRectangle(int32(screenX*scale), int32(ly*scale), int32(scale), int32(scale), colors[pixel])
+// 		}
+// 	}
+// }
 
-func (graphic *Graphics) generatePixels() {
-	lcdc := graphic.getLCDC()
+// func (graphic *Graphics) generatePixels() {
+// 	lcdc := graphic.getLCDC()
 
-	bgPixels := graphic.getBackground()
-	winPixels := graphic.getWindow()
-	spritePixels := graphic.spritesOAM()
+// 	bgPixels := graphic.getBackground()
+// 	winPixels := graphic.getWindow()
+// 	spritePixels := graphic.spritesOAM()
 
-	for ly := 0; ly < height; ly++ {
-		for screenX := 0; screenX < width; screenX++ {
-			var pixel uint8 = 0
+// 	for ly := 0; ly < height; ly++ {
+// 		for screenX := 0; screenX < width; screenX++ {
+// 			var pixel uint8 = 0
 
-			if lcdc&(1<<0) != 0 {
-				pixel = bgPixels[ly][screenX]
-				// window overrides background
-				if lcdc&(1<<5) != 0 {
-					pixel = winPixels[ly][screenX]
-				}
-			}
+// 			if lcdc&(1<<0) != 0 {
+// 				pixel = bgPixels[ly][screenX]
+// 				// window overrides background
+// 				if lcdc&(1<<5) != 0 {
+// 					pixel = winPixels[ly][screenX]
+// 				}
+// 			}
 
-			//sprites override
-			if lcdc&(1<<1) != 0 {
-				spriteCol := spritePixels[ly][screenX]
-				if spriteCol != 255 {
-					pixel = spriteCol
-				}
-			}
-			graphic.pixelBuffer[ly][screenX] = pixel
-		}
-	}
+// 			//sprites override
+// 			if lcdc&(1<<1) != 0 {
+// 				spriteCol := spritePixels[ly][screenX]
+// 				if spriteCol != 255 {
+// 					pixel = spriteCol
+// 				}
+// 			}
+// 			graphic.pixelBuffer[ly][screenX] = pixel
+// 		}
+// 	}
 
-}
+// }
 
-func (graphic *Graphics) render() {
-	graphic.generatePixels()
-	graphic.drawScreen()
-}
+// func (graphic *Graphics) render() {
+// 	graphic.generatePixels()
+// 	graphic.drawScreen()
+// }

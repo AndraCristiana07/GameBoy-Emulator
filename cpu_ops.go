@@ -578,9 +578,9 @@ func (cpu *CPU) op02() int {
 	return 8
 }
 
-// LD [r16], A r16=HL
+// LD [HL], r8=A
 func (cpu *CPU) op77() int {
-	cpu.ldmemr16A(cpu.Registers.getHL)
+	cpu.ldmemhl(cpu.Registers.A)
 	return 8
 }
 
