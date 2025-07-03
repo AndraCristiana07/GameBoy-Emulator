@@ -1,2 +1,0 @@
-zelda -
-    entry - C3 50 01
