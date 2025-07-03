@@ -544,51 +544,58 @@ func TestExecLD_L(t *testing.T) {
 // LD [HL], n
 func TestExecLD_HL(t *testing.T) {
 	cpu := NewCPU()
-	cpu.Registers.A = 0b11
-	cpu.Registers.B = 0b1
-	cpu.Registers.C = 0b10
-	cpu.Registers.D = 0b100
-	cpu.Registers.E = 0b101
-	cpu.Registers.H = 0b110
-	cpu.Registers.L = 0b111
+	// cpu.Registers.A = 0b11
+	// cpu.Registers.B = 0b1
+	// cpu.Registers.C = 0b10
+	// cpu.Registers.D = 0b100
+	// cpu.Registers.E = 0b101
+	// cpu.Registers.H = 0b110
+	// cpu.Registers.L = 0b111
+	cpu.Registers.A = 0x80
+	cpu.Registers.B = 0x81
+	cpu.Registers.C = 0x21
+	cpu.Registers.D = 0x84
+	cpu.Registers.E = 0x51
+	cpu.Registers.H = 0x92
+	cpu.Registers.L = 0x46
 
 	cpu.Memory[cpu.Registers.getHL()] = 0b1111
 	cpu.Memory[cpu.Registers.PC] = 0b1110111 // LD [HL], A
 	cpu.execOpcodes()
-	if cpu.Memory[cpu.Registers.getHL()] != 0b11 {
-		t.Error("Expected 0b11, got ", cpu.Memory[cpu.Registers.getHL()])
+	if cpu.Memory[cpu.Registers.getHL()] != 0x80 {
+		t.Error("Expected 0x80, got ", cpu.Memory[cpu.Registers.getHL()])
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1110000 // LD [HL], B
 	cpu.execOpcodes()
-	if cpu.Memory[cpu.Registers.getHL()] != 0b1 {
-		t.Error("Expected 0b1, got ", cpu.Memory[cpu.Registers.getHL()])
+	if cpu.Memory[cpu.Registers.getHL()] != 0x81 {
+		t.Error("Expected 0x81, got ", cpu.Memory[cpu.Registers.getHL()])
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1110001 // LD [HL], C
 	cpu.execOpcodes()
-	if cpu.Memory[cpu.Registers.getHL()] != 0b10 {
-		t.Error("Expected 0b100, got ", cpu.Memory[cpu.Registers.getHL()])
+	if cpu.Memory[cpu.Registers.getHL()] != 0x21 {
+		t.Error("Expected 0x21, got ", cpu.Memory[cpu.Registers.getHL()])
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1110010 // LD [HL], D
 	cpu.execOpcodes()
-	if cpu.Memory[cpu.Registers.getHL()] != 0b100 {
-		t.Error("Expected 0b100, got ", cpu.Memory[cpu.Registers.getHL()])
+	if cpu.Memory[cpu.Registers.getHL()] != 0x84 {
+		t.Error("Expected 0x84, got ", cpu.Memory[cpu.Registers.getHL()])
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1110011 // LD [HL], E
 	cpu.execOpcodes()
-	if cpu.Memory[cpu.Registers.getHL()] != 0b101 {
-		t.Error("Expected 0b101, got ", cpu.Memory[cpu.Registers.getHL()])
+	if cpu.Memory[cpu.Registers.getHL()] != 0x51 {
+		t.Error("Expected 0x51, got ", cpu.Memory[cpu.Registers.getHL()])
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b1110100 // LD [HL], H
 	cpu.execOpcodes()
-	if cpu.Memory[cpu.Registers.getHL()] != 0b110 {
-		t.Error("Expected 0b110, got ", cpu.Memory[cpu.Registers.getHL()])
+	if cpu.Memory[cpu.Registers.getHL()] != 0x92 {
+		t.Error("Expected 0x92, got ", cpu.Memory[cpu.Registers.getHL()])
 	}
 
 	cpu.Memory[cpu.Registers.getHL()] = 0b11
 	cpu.Memory[cpu.Registers.PC] = 0b1110101 // LD [HL], L
 	cpu.execOpcodes()
-	if cpu.Memory[cpu.Registers.getHL()] != 0b111 {
-		t.Error("Expected 0b111, got ", cpu.Memory[cpu.Registers.getHL()])
+	if cpu.Memory[cpu.Registers.getHL()] != 0x46 {
+		t.Error("Expected 0x46, got ", cpu.Memory[cpu.Registers.getHL()])
 	}
 	cpu.Memory[cpu.Registers.PC] = 0b110110 // LD L, imm8
 	cpu.Memory[cpu.Registers.PC+1] = 0b11
@@ -952,7 +959,7 @@ func TestSBC_A(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0b10011111 // SBC A, A
 	//fmt.Println("FLAGC", cpu.Registers.getFlag(flagC))
 	cpu.execOpcodes()
-	res = uint8(0b11110 - 0b11110 - 0)
+	res = uint8(0)
 	if cpu.Registers.A != res {
 		t.Errorf("Expected 0b%b, got 0b%b ", res, cpu.Registers.A)
 	}
@@ -1104,7 +1111,7 @@ func TestINC_DE(t *testing.T) {
 	cpu.Registers.D = 0b1
 	cpu.Registers.E = 0b10
 	cpu.Memory[cpu.Registers.PC] = 0b10011
-	fmt.Println("DE", cpu.Registers.getDE())
+	// fmt.Println("DE", cpu.Registers.getDE())
 	val := cpu.Registers.getDE()
 	val++
 	cpu.execOpcodes()
@@ -1134,14 +1141,16 @@ func TestINC_HLmem(t *testing.T) {
 	cpu := NewCPU()
 	cpu.Registers.L = 0b10
 	cpu.Registers.H = 0b1
-	cpu.Registers.setHL(0b100)
+	cpu.Registers.setHL(0x8001)
 	hladdr := cpu.Registers.getHL()
 	cpu.Memory[hladdr] = 0b100
 
 	cpu.Memory[cpu.Registers.PC] = 0b110100
+	// fmt.Println(cpu.Memory[cpu.Registers.getHL()])
+
 	cpu.execOpcodes()
 	// // fmt.Println(" INC [HL] TEST")
-	// // fmt.Println(cpu.Memory[cpu.Registers.getHL()])
+	// fmt.Println(cpu.Memory[cpu.Registers.getHL()])
 	if cpu.Memory[cpu.Registers.getHL()] != 0b101 {
 		t.Error("Expected 0b101, got ", cpu.Memory[cpu.Registers.getHL()])
 	}
@@ -1267,7 +1276,7 @@ func TestDEC_HLmem(t *testing.T) {
 	cpu := NewCPU()
 	cpu.Registers.H = 0b1
 	cpu.Registers.L = 0b10
-	cpu.Registers.setHL(0b100)
+	cpu.Registers.setHL(0x8021)
 	hladdr := cpu.Registers.getHL()
 	cpu.Memory[hladdr] = 0b100
 
@@ -1376,7 +1385,7 @@ func TestAND(t *testing.T) {
 
 	cpu.Memory[cpu.Registers.PC] = 0b10100111 // AND A, A
 	cpu.execOpcodes()
-	res = res & res
+
 	if cpu.Registers.A != uint8(res) {
 		t.Error("Expected 0b1, got ", cpu.Registers.A)
 	}
@@ -1532,65 +1541,66 @@ func TestPush(t *testing.T) {
 	cpu.Registers.F = 0b10
 	cpu.Registers.H = 0b110
 	cpu.Registers.L = 0b111
-	cpu.Registers.SP = 15
+	cpu.Registers.SP = 0x9210
 	cpu.Memory[cpu.Registers.PC] = 0b11000101 // PUSH BC
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 13 {
-		t.Error("Expected 13, got ", cpu.Registers.SP)
+	if cpu.Registers.SP != 0x920E {
+		t.Error("Expected 0x920E, got ", cpu.Registers.SP)
 	}
-	//fmt.Println((cpu.Registers.getBC() & 0xFF00) >> 8)
-	//fmt.Println(cpu.Registers.getBC() & 0xFF)
-	if cpu.Memory[cpu.Registers.SP+1] != 1 {
-		t.Error("Expected 1, got ", cpu.Registers.SP+1)
+	// fmt.Println("BC", cpu.Registers.getBC())
+	// fmt.Println("BC", (cpu.Registers.getBC()&0xFF00)>>8)
+	// fmt.Println("BC", cpu.Registers.getBC()&0xFF)
+	if cpu.Memory[0x920F] != 1 {
+		t.Error("Expected 1, got ", cpu.Memory[0x920F])
 	}
-	if cpu.Memory[cpu.Registers.SP] != 3 {
-		t.Error("Expected 3, got ", cpu.Registers.SP)
+	if cpu.Memory[0x920E] != 3 {
+		t.Error("Expected 3, got ", cpu.Memory[0x920E])
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b11010101 // PUSH DE
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 11 {
-		t.Error("Expected 11, got ", cpu.Registers.SP)
+	if cpu.Registers.SP != 0x920C {
+		t.Error("Expected 0x920C, got ", cpu.Registers.SP)
 	}
 	//fmt.Println((cpu.Registers.getDE() & 0xFF00) >> 8)
 	//fmt.Println(cpu.Registers.getDE() & 0xFF)
-	if cpu.Memory[cpu.Registers.SP+1] != 4 {
-		t.Error("Expected 4, got ", cpu.Registers.SP+1)
+	if cpu.Memory[0x920D] != 4 {
+		t.Error("Expected 4, got ", cpu.Memory[0x920D])
 	}
-	if cpu.Memory[cpu.Registers.SP] != 5 {
-		t.Error("Expected 5, got ", cpu.Registers.SP)
+	if cpu.Memory[0x920C] != 5 {
+		t.Error("Expected 5, got ", cpu.Memory[0x920C])
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b11100101 // PUSH HL
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 9 {
+	if cpu.Registers.SP != 0x920A {
 		t.Error("Expected 11, got ", cpu.Registers.SP)
 	}
 	//fmt.Println((cpu.Registers.getHL() & 0xFF00) >> 8)
 	//fmt.Println(cpu.Registers.getHL() & 0xFF)
-	if cpu.Memory[cpu.Registers.SP+1] != 6 {
-		t.Error("Expected 6, got ", cpu.Registers.SP+1)
+	if cpu.Memory[0x920B] != 6 {
+		t.Error("Expected 6, got ", cpu.Memory[0x920B])
 	}
-	if cpu.Memory[cpu.Registers.SP] != 7 {
-		t.Error("Expected 7, got ", cpu.Registers.SP)
+	if cpu.Memory[0x920A] != 7 {
+		t.Error("Expected 7, got ", cpu.Memory[0x920A])
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b11110101 // PUSH AF
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 7 {
-		t.Error("Expected 11, got ", cpu.Registers.SP)
+	if cpu.Registers.SP != 0x9208 {
+		t.Error("Expected 0x9208, got ", cpu.Registers.SP)
 	}
 	//fmt.Println("af", (cpu.Registers.getAF()&0xFF00)>>8)
 	//fmt.Println(cpu.Registers.getAF() & 0xFF)
-	if cpu.Memory[cpu.Registers.SP+1] != 3 {
-		t.Error("Expected 3, got ", cpu.Registers.SP+1)
+	if cpu.Memory[0x9209] != 3 {
+		t.Error("Expected 3, got ", cpu.Memory[0x9209])
 	}
-	if cpu.Memory[cpu.Registers.SP] != 2 {
-		t.Error("Expected 2, got ", cpu.Registers.SP)
+	if cpu.Memory[0x9208] != 2 {
+		t.Error("Expected 2, got ", cpu.Memory[0x9208])
 	}
 }
 
@@ -1680,25 +1690,25 @@ func TestRST(t *testing.T) {
 	cpu.Registers.F = 0b10
 	cpu.Registers.H = 0b110
 	cpu.Registers.L = 0b111
-	cpu.Registers.SP = 16
+	cpu.Registers.SP = 0x9110
 	cpu.Registers.PC = 0x0021
 	cpu.Memory[cpu.Registers.PC] = 0b11000111 //  RST $00
 	hi := (0x0022 & 0xFF00) >> 8
 	lo := 0x0022 & 0xFF
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 14 {
-		t.Error("Expected 14, got ", cpu.Registers.SP)
+	if cpu.Registers.SP != 0x910E {
+		t.Error("Expected 0x910E, got ", cpu.Registers.SP)
 	}
 	//fmt.Printf("PC %08b", cpu.Registers.PC)
 	//fmt.Printf("low is %02X", uint8(lo))
 	//fmt.Printf("high is %02X", uint8(hi))
 	//fmt.Printf("SP %02X SP+1 %02X", cpu.Memory[cpu.Registers.SP], cpu.Memory[cpu.Registers.SP+1])
-	if cpu.Memory[cpu.Registers.SP+1] != uint8(hi) {
-		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x910F] != uint8(hi) {
+		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[0x910F])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(lo) {
-		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x910E] != uint8(lo) {
+		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[0x910E])
 	}
 
 	if cpu.Registers.PC != 0x00 {
@@ -1712,14 +1722,14 @@ func TestRST(t *testing.T) {
 
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 12 {
+	if cpu.Registers.SP != 0x910C {
 		t.Error("Expected 12, got ", cpu.Registers.SP)
 	}
-	if cpu.Memory[cpu.Registers.SP+1] != uint8(hi) {
-		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x910D] != uint8(hi) {
+		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[0x910D])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(lo) {
-		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x910C] != uint8(lo) {
+		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[0x910C])
 	}
 
 	if cpu.Registers.PC != 0x08 {
@@ -1733,14 +1743,14 @@ func TestRST(t *testing.T) {
 
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 10 {
+	if cpu.Registers.SP != 0x910A {
 		t.Error("Expected 04, got ", cpu.Registers.SP)
 	}
-	if cpu.Memory[cpu.Registers.SP+1] != uint8(hi) {
-		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x910B] != uint8(hi) {
+		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[0x910B])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(lo) {
-		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x910A] != uint8(lo) {
+		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[0x910A])
 	}
 
 	if cpu.Registers.PC != 0x10 {
@@ -1754,14 +1764,14 @@ func TestRST(t *testing.T) {
 
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 8 {
+	if cpu.Registers.SP != 0x9108 {
 		t.Error("Expected 8, got ", cpu.Registers.SP)
 	}
-	if cpu.Memory[cpu.Registers.SP+1] != uint8(hi) {
-		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x9109] != uint8(hi) {
+		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[0x9109])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(lo) {
-		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x9108] != uint8(lo) {
+		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[0x9108])
 	}
 
 	if cpu.Registers.PC != 0x18 {
@@ -1775,14 +1785,14 @@ func TestRST(t *testing.T) {
 
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 6 {
+	if cpu.Registers.SP != 0x9106 {
 		t.Error("Expected 6, got ", cpu.Registers.SP)
 	}
-	if cpu.Memory[cpu.Registers.SP+1] != uint8(hi) {
-		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x9107] != uint8(hi) {
+		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[0x9107])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(lo) {
-		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x9106] != uint8(lo) {
+		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[0x9106])
 	}
 
 	if cpu.Registers.PC != 0x20 {
@@ -1796,14 +1806,14 @@ func TestRST(t *testing.T) {
 
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 4 {
+	if cpu.Registers.SP != 0x9104 {
 		t.Error("Expected 4, got ", cpu.Registers.SP)
 	}
-	if cpu.Memory[cpu.Registers.SP+1] != uint8(hi) {
-		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x9105] != uint8(hi) {
+		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[0x9105])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(lo) {
-		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x9104] != uint8(lo) {
+		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[0x9104])
 	}
 
 	if cpu.Registers.PC != 0x28 {
@@ -1817,14 +1827,14 @@ func TestRST(t *testing.T) {
 
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 2 {
+	if cpu.Registers.SP != 0x9102 {
 		t.Error("Expected 2, got ", cpu.Registers.SP)
 	}
-	if cpu.Memory[cpu.Registers.SP+1] != uint8(hi) {
-		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x9103] != uint8(hi) {
+		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[0x9103])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(lo) {
-		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x9102] != uint8(lo) {
+		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[0x9102])
 	}
 
 	if cpu.Registers.PC != 0x30 {
@@ -1838,14 +1848,14 @@ func TestRST(t *testing.T) {
 
 	cpu.execOpcodes()
 
-	if cpu.Registers.SP != 0 {
+	if cpu.Registers.SP != 0x9100 {
 		t.Error("Expected 14, got ", cpu.Registers.SP)
 	}
-	if cpu.Memory[cpu.Registers.SP+1] != uint8(hi) {
-		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x9101] != uint8(hi) {
+		t.Error("Expected ", uint8(hi), " got ", cpu.Memory[0x9101])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(lo) {
-		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x9100] != uint8(lo) {
+		t.Error("Expected ", uint8(lo), " got ", cpu.Memory[0x9100])
 	}
 
 	if cpu.Registers.PC != 0x38 {
@@ -1869,8 +1879,9 @@ func TestBIT(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC+1] = 0b1000000 //  BIT 0, B
 
 	cpu.execOpcodes()
-	res := 0b1 & (1 << 0)
-	fmt.Println(res)
+	res := uint8(0b1 & (1 << 0))
+	// fmt.Println(res)
+
 	if cpu.Registers.getFlag(flagN) != false {
 		t.Error("Expected false, got ", cpu.Registers.getFlag(flagN))
 	}
@@ -1878,7 +1889,7 @@ func TestBIT(t *testing.T) {
 		t.Error("Expected true, got ", cpu.Registers.getFlag(flagH))
 	}
 	if cpu.Registers.getFlag(flagZ) != false {
-		t.Error("Expected false, got ", cpu.Registers.getFlag(flagZ))
+		t.Error("Expected false, res is: ", res, "got ", cpu.Registers.getFlag(flagZ))
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0xCB
@@ -1886,7 +1897,8 @@ func TestBIT(t *testing.T) {
 
 	cpu.execOpcodes()
 	res = 0b11 & (1 << 0)
-	fmt.Println(res)
+	// fmt.Println(res)
+
 	if cpu.Registers.getFlag(flagN) != false {
 		t.Error("Expected false, got ", cpu.Registers.getFlag(flagN))
 	}
@@ -1894,7 +1906,7 @@ func TestBIT(t *testing.T) {
 		t.Error("Expected true, got ", cpu.Registers.getFlag(flagH))
 	}
 	if cpu.Registers.getFlag(flagZ) != false {
-		t.Error("Expected false, got ", cpu.Registers.getFlag(flagZ))
+		t.Error("Expected false, res is: ", res, "got", cpu.Registers.getFlag(flagZ))
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0xCB
@@ -1902,7 +1914,8 @@ func TestBIT(t *testing.T) {
 
 	cpu.execOpcodes()
 	res = 0b100 & (1 << 0)
-	fmt.Println(res)
+	// fmt.Println(res)
+
 	if cpu.Registers.getFlag(flagN) != false {
 		t.Error("Expected false, got ", cpu.Registers.getFlag(flagN))
 	}
@@ -1910,7 +1923,7 @@ func TestBIT(t *testing.T) {
 		t.Error("Expected true, got ", cpu.Registers.getFlag(flagH))
 	}
 	if cpu.Registers.getFlag(flagZ) != true {
-		t.Error("Expected true, got ", cpu.Registers.getFlag(flagZ))
+		t.Error("Expected true, res is: ", res, "got", cpu.Registers.getFlag(flagZ))
 	}
 
 	// BIT 0 E-A, BIT 1 A-L
@@ -1920,7 +1933,8 @@ func TestBIT(t *testing.T) {
 
 	cpu.execOpcodes()
 	res = 0b100 & (1 << 2)
-	fmt.Println(res)
+	// fmt.Println(res)
+
 	if cpu.Registers.getFlag(flagN) != false {
 		t.Error("Expected false, got ", cpu.Registers.getFlag(flagN))
 	}
@@ -1928,7 +1942,7 @@ func TestBIT(t *testing.T) {
 		t.Error("Expected true, got ", cpu.Registers.getFlag(flagH))
 	}
 	if cpu.Registers.getFlag(flagZ) != false {
-		t.Error("Expected false, got ", cpu.Registers.getFlag(flagZ))
+		t.Error("Expected false, res is: ", res, "got", cpu.Registers.getFlag(flagZ))
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0xCB
@@ -1936,7 +1950,8 @@ func TestBIT(t *testing.T) {
 
 	cpu.execOpcodes()
 	res = 0b111 & (1 << 2)
-	fmt.Println(res)
+	// fmt.Println(res)
+
 	if cpu.Registers.getFlag(flagN) != false {
 		t.Error("Expected false, got ", cpu.Registers.getFlag(flagN))
 	}
@@ -1944,7 +1959,7 @@ func TestBIT(t *testing.T) {
 		t.Error("Expected true, got ", cpu.Registers.getFlag(flagH))
 	}
 	if cpu.Registers.getFlag(flagZ) != false {
-		t.Error("Expected false, got ", cpu.Registers.getFlag(flagZ))
+		t.Error("Expected false, res is: ", res, "got", cpu.Registers.getFlag(flagZ))
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0xCB
@@ -1952,7 +1967,8 @@ func TestBIT(t *testing.T) {
 
 	cpu.execOpcodes()
 	res = 0b11 & (1 << 3)
-	fmt.Println(res)
+	// fmt.Println(res)
+
 	if cpu.Registers.getFlag(flagN) != false {
 		t.Error("Expected false, got ", cpu.Registers.getFlag(flagN))
 	}
@@ -1960,7 +1976,7 @@ func TestBIT(t *testing.T) {
 		t.Error("Expected true, got ", cpu.Registers.getFlag(flagH))
 	}
 	if cpu.Registers.getFlag(flagZ) != true {
-		t.Error("Expected true, got ", cpu.Registers.getFlag(flagZ))
+		t.Error("Expected true, res is: ", res, "got", cpu.Registers.getFlag(flagZ))
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0xCB
@@ -1968,7 +1984,8 @@ func TestBIT(t *testing.T) {
 
 	cpu.execOpcodes()
 	res = 0b101 & (1 << 4)
-	fmt.Println(res)
+	// fmt.Println(res)
+
 	if cpu.Registers.getFlag(flagN) != false {
 		t.Error("Expected false, got ", cpu.Registers.getFlag(flagN))
 	}
@@ -1976,15 +1993,17 @@ func TestBIT(t *testing.T) {
 		t.Error("Expected true, got ", cpu.Registers.getFlag(flagH))
 	}
 	if cpu.Registers.getFlag(flagZ) != true {
-		t.Error("Expected true, got ", cpu.Registers.getFlag(flagZ))
+		t.Error("Expected true, res is: ", res, "got", cpu.Registers.getFlag(flagZ))
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b1110110 //  BIT 6, [HL]
 
 	cpu.execOpcodes()
-	res = int(cpu.Registers.getHL() & (1 << 6))
-	fmt.Println(res)
+	addr := cpu.memoryRead(cpu.Registers.getHL())
+	res = addr & (1 << 6)
+	// fmt.Println(res)
+
 	if cpu.Registers.getFlag(flagN) != false {
 		t.Error("Expected false, got ", cpu.Registers.getFlag(flagN))
 	}
@@ -1992,7 +2011,7 @@ func TestBIT(t *testing.T) {
 		t.Error("Expected true, got ", cpu.Registers.getFlag(flagH))
 	}
 	if cpu.Registers.getFlag(flagZ) != true {
-		t.Error("Expected true, got ", cpu.Registers.getFlag(flagZ))
+		t.Error("Expected true, res is: ", res, "got", cpu.Registers.getFlag(flagZ))
 	}
 
 }
@@ -2006,15 +2025,16 @@ func TestSET(t *testing.T) {
 	cpu.Registers.D = 0b100
 	cpu.Registers.E = 0b101
 	cpu.Registers.F = 0b10
-	cpu.Registers.H = 0b110
-	cpu.Registers.L = 0b111
+	cpu.Registers.H = 0x80
+	cpu.Registers.L = 0x30
 	cpu.Registers.SP = 16
+	// cpu.Registers.setHL(0x8003)
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b11000111 //  SET 0, A
 
 	cpu.execOpcodes()
 	res := uint8(0b11 | (1 << 0))
-	fmt.Println(res)
+	// fmt.Println(res)
 	if cpu.Registers.A != res {
 		t.Error("Expected ", res, " got ", cpu.Registers.A)
 	}
@@ -2024,7 +2044,7 @@ func TestSET(t *testing.T) {
 
 	cpu.execOpcodes()
 	res = uint8(0b101 | (1 << 1))
-	fmt.Println(res)
+	// fmt.Println(res)
 	if cpu.Registers.E != res {
 		t.Error("Expected ", res, " got ", cpu.Registers.E)
 	}
@@ -2033,8 +2053,8 @@ func TestSET(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC+1] = 0b11010101 // SET 2, L
 
 	cpu.execOpcodes()
-	res = uint8(0b111 | (1 << 2))
-	fmt.Println(res)
+	res = uint8(0x30 | (1 << 2))
+	// fmt.Println(res)
 	if cpu.Registers.L != res {
 		t.Error("Expected ", res, " got ", cpu.Registers.L)
 	}
@@ -2044,7 +2064,7 @@ func TestSET(t *testing.T) {
 
 	cpu.execOpcodes()
 	res = uint8(0b100 | (1 << 3))
-	fmt.Println(res)
+	// fmt.Println(res)
 	if cpu.Registers.D != res {
 		t.Error("Expected ", res, " got ", cpu.Registers.D)
 	}
@@ -2054,7 +2074,7 @@ func TestSET(t *testing.T) {
 
 	cpu.execOpcodes()
 	res = uint8(0b11 | (1 << 4))
-	fmt.Println(res)
+	// fmt.Println(res)
 	if cpu.Registers.C != res {
 		t.Error("Expected ", res, " got ", cpu.Registers.C)
 	}
@@ -2063,8 +2083,8 @@ func TestSET(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC+1] = 0b11101100 // SET 5, H
 
 	cpu.execOpcodes()
-	res = uint8(0b110 | (1 << 5))
-	fmt.Println(res)
+	res = uint8(0x80 | (1 << 5))
+	// fmt.Println(res)
 	if cpu.Registers.H != res {
 		t.Error("Expected ", res, " got ", cpu.Registers.H)
 	}
@@ -2074,7 +2094,7 @@ func TestSET(t *testing.T) {
 	cpu.Memory[cpu.Registers.getHL()] = 0b1
 	cpu.execOpcodes()
 	res = uint8(cpu.Memory[cpu.Registers.getHL()] | (1 << 6))
-	fmt.Println(res)
+	// fmt.Println(res)
 	if cpu.Memory[cpu.Registers.getHL()] != res {
 		t.Error("Expected ", res, " got ", cpu.Memory[cpu.Registers.getHL()])
 	}
@@ -2122,7 +2142,7 @@ func TestRES(t *testing.T) {
 	fmt.Printf("reg e %02X", cpu.Registers.E)
 	cpu.execOpcodes()
 	res = 0b101 & ^(1 << 4)
-	fmt.Printf("reg e %02X", cpu.Registers.E)
+	// fmt.Printf("reg e %02X", cpu.Registers.E)
 	if cpu.Registers.E != uint8(res) {
 		t.Error("Expected ", res, " got ", cpu.Registers.E)
 	}
@@ -2133,7 +2153,7 @@ func TestRES(t *testing.T) {
 	cpu.execOpcodes()
 
 	res = 0b1 & ^(1 << 5)
-	fmt.Println("Aaaaaaaaaaaa")
+	// fmt.Println("Aaaaaaaaaaaa")
 	if cpu.Memory[cpu.Registers.getHL()] != uint8(res) {
 		t.Error("Expected ", res, " got ", cpu.Memory[cpu.Registers.getHL()])
 	}
@@ -2201,12 +2221,13 @@ func TestSWAP(t *testing.T) {
 		t.Error("Expected ", 0b00110000, " got ", cpu.Registers.A)
 	}
 
+	cpu.Registers.setHL(0x9001)
 	cpu.Memory[cpu.Registers.getHL()] = 0b11
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b110110 //  SWAP [HL]
 	cpu.execOpcodes()
-	if cpu.Memory[cpu.Registers.getHL()] != 0b00110000 {
-		t.Error("Expected ", 0b00110000, " got ", cpu.Registers.A)
+	if cpu.Memory[cpu.Registers.getHL()] != 0x30 {
+		t.Error("Expected ", 0x30, " got ", cpu.Memory[cpu.Registers.getHL()])
 	}
 
 }
@@ -2289,10 +2310,11 @@ func TestSLA(t *testing.T) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.A)
 	}
 
+	cpu.Registers.setHL(0x9032)
+
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b100110 //  SLA [HL]
 	cpu.Memory[cpu.Registers.getHL()] = 0b11
-
 	cpu.execOpcodes()
 
 	reg = 0b11 << 1
@@ -2370,6 +2392,7 @@ func TestSRA(t *testing.T) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.A)
 	}
 
+	cpu.Registers.setHL(0x9032)
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b101110 //  SRA [HL]
 	cpu.Memory[cpu.Registers.getHL()] = 0b11
@@ -2449,6 +2472,7 @@ func TestSRL(t *testing.T) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.A)
 	}
 
+	cpu.Registers.setHL(0x9832)
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b111110 //  SRL [HL]
 	cpu.Memory[cpu.Registers.getHL()] = 0b101
@@ -2528,6 +2552,7 @@ func TestRLC(t *testing.T) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.A)
 	}
 
+	cpu.Registers.setHL(0x8029)
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b110 //  RLC [HL]
 	cpu.Memory[cpu.Registers.getHL()] = 0b101
@@ -2608,6 +2633,7 @@ func TestRL(t *testing.T) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.A)
 	}
 
+	cpu.Registers.setHL(0x9013)
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b10110 //  RL [HL]
 	cpu.Memory[cpu.Registers.getHL()] = 0b101
@@ -2645,7 +2671,7 @@ func TestRRC(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b1000 //  RRC B
 	cpu.execOpcodes()
-	reg := 0b1 >> 1
+	reg := (0b1 >> 1) | (0b1&0b00000001)<<7
 	if cpu.Registers.B != uint8(reg) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.B)
 	}
@@ -2653,7 +2679,7 @@ func TestRRC(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b1001 //  RRC C
 	cpu.execOpcodes()
-	reg = 0b11 >> 1
+	reg = 0b11>>1 | (0b11&0b00000001)<<7
 	if cpu.Registers.C != uint8(reg) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.C)
 	}
@@ -2661,7 +2687,7 @@ func TestRRC(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b1010 //  RRC D
 	cpu.execOpcodes()
-	reg = 0b100 >> 1
+	reg = 0b100>>1 | (0b100&0b00000001)<<7
 	if cpu.Registers.D != uint8(reg) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.D)
 	}
@@ -2669,7 +2695,7 @@ func TestRRC(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b1011 //  RRC E
 	cpu.execOpcodes()
-	reg = 0b101 >> 1
+	reg = 0b101>>1 | (0b101&0b00000001)<<7
 	if cpu.Registers.E != uint8(reg) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.E)
 	}
@@ -2677,7 +2703,7 @@ func TestRRC(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b1100 //  RRC H
 	cpu.execOpcodes()
-	reg = 0b110 >> 1
+	reg = 0b110>>1 | (0b110&0b00000001)<<7
 	if cpu.Registers.H != uint8(reg) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.H)
 	}
@@ -2685,27 +2711,29 @@ func TestRRC(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b1111 //  RRC A
 	cpu.execOpcodes()
-	reg = 0b11 >> 1
+	reg = 0b11>>1 | (0b11&0b00000001)<<7
 	if cpu.Registers.A != uint8(reg) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.A)
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0xCB
+	cpu.Memory[cpu.Registers.PC+1] = 0b1101 //  RRC L
+	cpu.execOpcodes()
+	reg = 0b111>>1 | (0b111&0b00000001)<<7
+	if cpu.Registers.L != uint8(reg) {
+		t.Error("Expected ", reg, " got ", cpu.Registers.A)
+	}
+
+	cpu.Registers.setHL(0x8922)
+	cpu.Memory[cpu.Registers.PC] = 0xCB
 	cpu.Memory[cpu.Registers.PC+1] = 0b1110 //  RRC [HL]
 	cpu.Memory[cpu.Registers.getHL()] = 0b1111
 	cpu.execOpcodes()
-	reg = 0b1111 >> 1
+	reg = 0b1111>>1 | (0b1111&0b00000001)<<7
 	if cpu.Memory[cpu.Registers.getHL()] != uint8(reg) {
 		t.Error("Expected ", reg, " got ", cpu.Memory[cpu.Registers.getHL()])
 	}
 
-	cpu.Memory[cpu.Registers.PC] = 0xCB
-	cpu.Memory[cpu.Registers.PC+1] = 0b1101 //  RRC L
-	cpu.execOpcodes()
-	reg = 0b111 >> 1
-	if cpu.Registers.L != uint8(reg) {
-		t.Error("Expected ", reg, " got ", cpu.Registers.A)
-	}
 }
 
 // RR
@@ -2810,7 +2838,7 @@ func TestLDnn(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0b1 //  LD BC, imm16
 	cpu.Memory[cpu.Registers.PC+1] = 0b1
 	cpu.Memory[cpu.Registers.PC+2] = 0b11
-	fmt.Println("bc", cpu.Registers.getBC())
+	// fmt.Println("bc", cpu.Registers.getBC())
 
 	reg := 0b001100000001
 	cpu.execOpcodes()
@@ -2822,7 +2850,7 @@ func TestLDnn(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0b10001 //  LD DE, imm16
 	cpu.Memory[cpu.Registers.PC+1] = 0b1
 	cpu.Memory[cpu.Registers.PC+2] = 0b11
-	fmt.Println("bc", cpu.Registers.getBC())
+	// fmt.Println("bc", cpu.Registers.getBC())
 
 	reg = 0b001100000001
 	cpu.execOpcodes()
@@ -2836,13 +2864,13 @@ func TestLDnn(t *testing.T) {
 func TestLD_mem_nn(t *testing.T) {
 	cpu := NewCPU()
 	cpu.Registers.A = 0b11
-	cpu.Registers.B = 0b1
-	cpu.Registers.C = 0b11
-	cpu.Registers.D = 0b100
-	cpu.Registers.E = 0b101
+	cpu.Registers.B = 0x83
+	cpu.Registers.C = 0x91
+	cpu.Registers.D = 0x91
+	cpu.Registers.E = 0x83
 	cpu.Registers.F = 0b10
-	cpu.Registers.H = 0b110
-	cpu.Registers.L = 0b111
+	cpu.Registers.H = 0x92
+	cpu.Registers.L = 0x86
 	cpu.Registers.SP = 16
 
 	cpu.Memory[cpu.Registers.PC] = 0b10 //  LD [BC], A
@@ -2852,11 +2880,11 @@ func TestLD_mem_nn(t *testing.T) {
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b1000 //  LD [imm16], SP
-	cpu.Memory[cpu.Registers.PC+1] = 0b1
-	cpu.Memory[cpu.Registers.PC+2] = 0b11
+	cpu.Memory[cpu.Registers.PC+1] = 0x85
+	cpu.Memory[cpu.Registers.PC+2] = 0x91
 	cpu.execOpcodes()
-	if cpu.Memory[0b001100000001] != 16 {
-		t.Error("Expected ", 16, " got ", cpu.Memory[0b001100000001])
+	if cpu.Memory[0x9185] != 16 {
+		t.Error("Expected ", 16, " got ", cpu.Memory[0x9185])
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b10010 //  LD [DE], A
@@ -2866,11 +2894,12 @@ func TestLD_mem_nn(t *testing.T) {
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b11101010 //  LD [imm16], A
-	cpu.Memory[cpu.Registers.PC+1] = 0b1
-	cpu.Memory[cpu.Registers.PC+2] = 0b11
+	cpu.Memory[cpu.Registers.PC+1] = 0x85
+	cpu.Memory[cpu.Registers.PC+2] = 0x96
+	res := uint16(0x85) | 0x96<<8
 	cpu.execOpcodes()
-	if cpu.Memory[0b001100000001] != 0b11 {
-		t.Error("Expected ", 0b11, " got ", cpu.Memory[cpu.Registers.getDE()])
+	if cpu.Memory[res] != 0b11 {
+		t.Error("Expected ", 0b11, " got ", cpu.Memory[res])
 	}
 }
 
@@ -2975,22 +3004,17 @@ func TestJR(t *testing.T) {
 func TestHLA(t *testing.T) {
 	cpu := NewCPU()
 	cpu.Registers.A = 0b11
-	cpu.Registers.B = 0b1
-	cpu.Registers.C = 0b11
-	cpu.Registers.D = 0b100
-	cpu.Registers.E = 0b101
-	cpu.Registers.F = 0b10
-	cpu.Registers.H = 0b110
-	cpu.Registers.L = 0b111
 	cpu.Registers.SP = 16
 	cpu.Registers.PC = 0b1
+
+	cpu.Registers.setHL(0x9148)
 
 	cpu.Memory[cpu.Registers.PC] = 0b100010 // LD [HL+], A
 	hl := cpu.Registers.getHL()
 
 	cpu.execOpcodes()
-	fmt.Println("hl", cpu.Registers.getHL())
-	fmt.Println("hl mem", cpu.Memory[cpu.Registers.getHL()])
+	// fmt.Println("hl", cpu.Registers.getHL())
+	// fmt.Println("hl mem", cpu.Memory[cpu.Registers.getHL()])
 	if cpu.Memory[hl] != 0b11 {
 		t.Error("Expected ", 0b11, " got ", cpu.Memory[cpu.Registers.getHL()])
 	}
@@ -2999,8 +3023,8 @@ func TestHLA(t *testing.T) {
 	hl = cpu.Registers.getHL()
 
 	cpu.execOpcodes()
-	fmt.Println("hl", cpu.Registers.getHL())
-	fmt.Println("hl mem", cpu.Memory[cpu.Registers.getHL()])
+	// fmt.Println("hl", cpu.Registers.getHL())
+	// fmt.Println("hl mem", cpu.Memory[cpu.Registers.getHL()])
 	if cpu.Memory[hl] != 0b11 {
 		t.Error("Expected ", 0b11, " got ", cpu.Memory[cpu.Registers.getHL()])
 	}
@@ -3023,8 +3047,8 @@ func TestA_HL(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0b101010 // LD A, [HL+]
 	cpu.Memory[cpu.Registers.getHL()] = 0b111
 	cpu.execOpcodes()
-	fmt.Println("hl", cpu.Registers.getHL())
-	fmt.Println("hl mem", cpu.Memory[cpu.Registers.getHL()])
+	// fmt.Println("hl", cpu.Registers.getHL())
+	// fmt.Println("hl mem", cpu.Memory[cpu.Registers.getHL()])
 	if cpu.Registers.A != 0b111 {
 		t.Error("Expected ", 0b111, " got ", cpu.Registers.A)
 	}
@@ -3032,8 +3056,8 @@ func TestA_HL(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0b111010 // LD A, [HL-]
 	cpu.Memory[cpu.Registers.getHL()] = 0b111
 	cpu.execOpcodes()
-	fmt.Println("hl", cpu.Registers.getHL())
-	fmt.Println("hl mem", cpu.Memory[cpu.Registers.getHL()])
+	// fmt.Println("hl", cpu.Registers.getHL())
+	// fmt.Println("hl mem", cpu.Memory[cpu.Registers.getHL()])
 	if cpu.Registers.A != 0b111 {
 		t.Error("Expected ", 0b111, " got ", cpu.Registers.A)
 	}
@@ -3129,7 +3153,7 @@ func TestXOR(t *testing.T) {
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b10101111 // XOR A, A
-	reg = reg ^ reg
+	reg = 0
 	cpu.execOpcodes()
 	if cpu.Registers.A != uint8(reg) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.A)
@@ -3209,7 +3233,7 @@ func TestOR(t *testing.T) {
 	}
 
 	cpu.Memory[cpu.Registers.PC] = 0b10110111 // OR A, A
-	reg = reg | reg
+
 	cpu.execOpcodes()
 	if cpu.Registers.A != uint8(reg) {
 		t.Error("Expected ", reg, " got ", cpu.Registers.A)
@@ -3344,7 +3368,7 @@ func TestCALL_NZ(t *testing.T) {
 	cpu.Registers.F = 0b10
 	cpu.Registers.H = 0b110
 	cpu.Registers.L = 0b111
-	cpu.Registers.SP = 16
+	cpu.Registers.SP = 0x9210
 	cpu.Registers.PC = 0b1
 
 	cpu.Memory[cpu.Registers.PC] = 0b11000100 // CALL NZ, imm16
@@ -3355,11 +3379,11 @@ func TestCALL_NZ(t *testing.T) {
 	cpu.Registers.setFlag(flagZ, false)
 	cpu.execOpcodes()
 
-	if cpu.Memory[cpu.Registers.SP+1] != uint8((0b100&0xFF00)>>8) {
-		t.Error("Expected ", uint8((0b100&0xFF00)>>8), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x920F] != uint8((0b100&0xFF00)>>8) {
+		t.Error("Expected ", uint8((0b100&0xFF00)>>8), " got ", cpu.Memory[0x920F])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(0b100&0xFF) {
-		t.Error("Expected ", uint8(0b100&0xFF), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x920E] != uint8(0b100&0xFF) {
+		t.Error("Expected ", uint8(0b100&0xFF), " got ", cpu.Memory[0x920E])
 	}
 
 	if cpu.Registers.PC != uint16(reg) {
@@ -3391,7 +3415,7 @@ func TestCALL_Z(t *testing.T) {
 	cpu.Registers.F = 0b10
 	cpu.Registers.H = 0b110
 	cpu.Registers.L = 0b111
-	cpu.Registers.SP = 16
+	cpu.Registers.SP = 0x920C
 	cpu.Registers.PC = 0b1
 
 	cpu.Memory[cpu.Registers.PC] = 0b11001100 // CALL Z, imm16
@@ -3401,11 +3425,11 @@ func TestCALL_Z(t *testing.T) {
 	reg := 0b001100000001
 	cpu.execOpcodes()
 
-	if cpu.Memory[cpu.Registers.SP+1] != uint8((0b100&0xFF00)>>8) {
-		t.Error("Expected ", uint8((0b100&0xFF00)>>8), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x920B] != uint8((0b100&0xFF00)>>8) {
+		t.Error("Expected ", uint8((0b100&0xFF00)>>8), " got ", cpu.Memory[0x920B])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(0b100&0xFF) {
-		t.Error("Expected ", uint8(0b100&0xFF), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x920A] != uint8(0b100&0xFF) {
+		t.Error("Expected ", uint8(0b100&0xFF), " got ", cpu.Memory[0x920A])
 	}
 
 	if cpu.Registers.PC != uint16(reg) {
@@ -3440,7 +3464,7 @@ func TestCALL_NC(t *testing.T) {
 	cpu.Registers.F = 0b10
 	cpu.Registers.H = 0b110
 	cpu.Registers.L = 0b111
-	cpu.Registers.SP = 16
+	cpu.Registers.SP = 0x920C
 	cpu.Registers.PC = 0b1
 
 	cpu.Memory[cpu.Registers.PC] = 0b11010100 // CALL NC, imm16
@@ -3449,11 +3473,11 @@ func TestCALL_NC(t *testing.T) {
 	reg := 0b001100000001
 	cpu.execOpcodes()
 
-	if cpu.Memory[cpu.Registers.SP+1] != uint8((0b100&0xFF00)>>8) {
-		t.Error("Expected ", uint8((0b100&0xFF00)>>8), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x920B] != uint8((0b100&0xFF00)>>8) {
+		t.Error("Expected ", uint8((0b100&0xFF00)>>8), " got ", cpu.Memory[0x920B])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(0b100&0xFF) {
-		t.Error("Expected ", uint8(0b100&0xFF), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x920A] != uint8(0b100&0xFF) {
+		t.Error("Expected ", uint8(0b100&0xFF), " got ", cpu.Memory[0x920A])
 	}
 
 	if cpu.Registers.PC != uint16(reg) {
@@ -3488,7 +3512,7 @@ func TestCALL_C(t *testing.T) {
 	cpu.Registers.F = 0b10
 	cpu.Registers.H = 0b110
 	cpu.Registers.L = 0b111
-	cpu.Registers.SP = 16
+	cpu.Registers.SP = 0x920C
 	cpu.Registers.PC = 0b1
 
 	cpu.Memory[cpu.Registers.PC] = 0b11011100 // CALL C, imm16
@@ -3498,11 +3522,11 @@ func TestCALL_C(t *testing.T) {
 	reg := 0b001100000001
 	cpu.execOpcodes()
 
-	if cpu.Memory[cpu.Registers.SP+1] != uint8((0b100&0xFF00)>>8) {
-		t.Error("Expected ", uint8((0b100&0xFF00)>>8), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x920B] != uint8((0b100&0xFF00)>>8) {
+		t.Error("Expected ", uint8((0b100&0xFF00)>>8), " got ", cpu.Memory[0x920B])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(0b100&0xFF) {
-		t.Error("Expected ", uint8(0b100&0xFF), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x920A] != uint8(0b100&0xFF) {
+		t.Error("Expected ", uint8(0b100&0xFF), " got ", cpu.Memory[0x920A])
 	}
 
 	if cpu.Registers.PC != uint16(reg) {
@@ -3537,7 +3561,7 @@ func TestCALL_imm8(t *testing.T) {
 	cpu.Registers.F = 0b10
 	cpu.Registers.H = 0b110
 	cpu.Registers.L = 0b111
-	cpu.Registers.SP = 16
+	cpu.Registers.SP = 0x920C
 	cpu.Registers.PC = 0b1
 
 	cpu.Memory[cpu.Registers.PC] = 0b11001101 // CALL imm16
@@ -3546,11 +3570,11 @@ func TestCALL_imm8(t *testing.T) {
 	reg := 0b001100000001
 	cpu.execOpcodes()
 
-	if cpu.Memory[cpu.Registers.SP+1] != uint8((0b100&0xFF00)>>8) {
-		t.Error("Expected ", uint8((0b100&0xFF00)>>8), " got ", cpu.Memory[cpu.Registers.SP+1])
+	if cpu.Memory[0x920B] != uint8((0b100&0xFF00)>>8) {
+		t.Error("Expected ", uint8((0b100&0xFF00)>>8), " got ", cpu.Memory[0x920B])
 	}
-	if cpu.Memory[cpu.Registers.SP] != uint8(0b100&0xFF) {
-		t.Error("Expected ", uint8(0b100&0xFF), " got ", cpu.Memory[cpu.Registers.SP])
+	if cpu.Memory[0x920A] != uint8(0b100&0xFF) {
+		t.Error("Expected ", uint8(0b100&0xFF), " got ", cpu.Memory[0x920A])
 	}
 
 	if cpu.Registers.PC != uint16(reg) {
@@ -3981,11 +4005,11 @@ func Test_RLCA(t *testing.T) {
 	cpu.Memory[cpu.Registers.PC] = 0b111 // RLCA
 	res := 0b11 << 1
 	c := (0b11 & 0x80) >> 7
-	fmt.Println("carry", c)
+	// fmt.Println("carry", c)
 	cpu.execOpcodes()
 
 	if cpu.Registers.A != uint8(res) {
-		t.Error("Expected ", uint8(res), " got ", cpu.Registers.A)
+		t.Error("Expected ", uint8(res), "carry is", c, " got ", cpu.Registers.A)
 	}
 	if cpu.Registers.getFlag(flagC) != false {
 		t.Error("Expected false, got ", cpu.Registers.getFlag(flagC))
@@ -3997,24 +4021,18 @@ func Test_RLCA(t *testing.T) {
 func Test_RRCA(t *testing.T) {
 	cpu := NewCPU()
 	cpu.Registers.A = 0b11
-	cpu.Registers.B = 0b1
-	cpu.Registers.C = 0b11
-	cpu.Registers.D = 0b100
-	cpu.Registers.E = 0b101
-	cpu.Registers.F = 0b10
-	cpu.Registers.H = 0b110
-	cpu.Registers.L = 0b111
+
 	cpu.Registers.SP = 16
 	cpu.Registers.PC = 0b1
 
 	cpu.Memory[cpu.Registers.PC] = 0b1111 // RRCA
-	res := 0b11 >> 1
+	res := 0b11>>1 | (0b11 & 0b00000001 << 7)
 	c := 0b11 & 0x01
-	fmt.Println("carry", c)
+	// fmt.Println("carry", c)
 	cpu.execOpcodes()
 
 	if cpu.Registers.A != uint8(res) {
-		t.Error("Expected ", uint8(res), " got ", cpu.Registers.A)
+		t.Error("Expected ", uint8(res), "carry is", c, cpu.Registers.A)
 	}
 	if cpu.Registers.getFlag(flagC) != true {
 		t.Error("Expected true, got ", cpu.Registers.getFlag(flagC))
@@ -4037,13 +4055,13 @@ func Test_RLA(t *testing.T) {
 	cpu.Registers.PC = 0b1
 
 	cpu.Memory[cpu.Registers.PC] = 0b10111 // RLA
-	res := (0b11 << 1) | 0
+	res := 0b11 << 1
 	c := 0b11 & 0x80
-	fmt.Println("carry", c)
+	// fmt.Println("carry", c)
 	cpu.execOpcodes()
 
 	if cpu.Registers.A != uint8(res) {
-		t.Error("Expected ", uint8(res), " got ", cpu.Registers.A)
+		t.Error("Expected ", uint8(res), "carry is", c, cpu.Registers.A)
 	}
 	if cpu.Registers.getFlag(flagC) != false {
 		t.Error("Expected false, got ", cpu.Registers.getFlag(flagC))
@@ -4054,11 +4072,11 @@ func Test_RLA(t *testing.T) {
 	res = (0b0110 << 1) | 1
 	c = 0b0110 & 0x80
 	cpu.Registers.setFlag(flagC, true)
-	fmt.Println("carry", c)
+	// fmt.Println("carry", c)
 	cpu.execOpcodes()
 
 	if cpu.Registers.A != uint8(res) {
-		t.Error("Expected ", uint8(res), " got ", cpu.Registers.A)
+		t.Error("Expected ", uint8(res), "carry is", c, cpu.Registers.A)
 	}
 	if cpu.Registers.getFlag(flagC) != false {
 		t.Error("Expected false, got ", cpu.Registers.getFlag(flagC))
@@ -4125,9 +4143,13 @@ func Test_DAA(t *testing.T) {
 	cpu.Registers.PC = 0b1
 
 	cpu.Memory[cpu.Registers.PC] = 0b100111 // DAA
-	lo := 0b11 % 10
-	hi := ((0b11 - lo) % 100) / 10
-	res := (hi << 4) | lo
+	// lo := 0b11 % 10
+	// hi := ((0b11 - lo) % 100) / 10
+	// res := (hi << 4) | lo
+	cpu.Registers.setFlag(flagN, false)
+	cpu.Registers.setFlag(flagC, true)
+	adj := 0 | 0x60
+	res := 0b11 + adj
 	cpu.execOpcodes()
 
 	if cpu.Registers.A != uint8(res) {
@@ -4278,7 +4300,6 @@ func TestDI(t *testing.T) {
 	}
 }
 
-// TODO: EI
 func TestEI(t *testing.T) {
 	cpu := NewCPU()
 

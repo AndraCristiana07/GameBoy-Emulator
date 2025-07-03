@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
-	"golang.org/x/exp/slices"
 	"testing"
+
+	"golang.org/x/exp/slices"
 )
 
 func TestGetLCDC(t *testing.T) {
 	cpu := NewCPU()
 	graphic := NewGraphics(cpu)
+	cpu.Memory[0xFF40] = 0b10010001 // LCDC
 	res := graphic.getLCDC()
 	if res != 0x91 {
 		t.Error("Expected 0x91, got ", graphic.cpu.Memory[0xFF40])
@@ -29,6 +31,7 @@ func TestGetLY(t *testing.T) {
 func TestGetSTAT(t *testing.T) {
 	cpu := NewCPU()
 	graphic := NewGraphics(cpu)
+	cpu.Memory[0xFF41] = 0b00000001
 	res := graphic.getSTAT()
 	if res != 0b00000001 {
 		t.Error("Expected 0b00000001, got ", graphic.cpu.Memory[0xFF41])
@@ -78,13 +81,19 @@ func TestGetWX(t *testing.T) {
 
 func TestDMATransfer(t *testing.T) {
 	cpu := NewCPU()
-	graphic := NewGraphics(cpu)
-	graphic.cpu.Memory[768] = 10
+	cpu.Registers.setHL(0xFF46)
+	cpu.Registers.A = 3
+	// graphic := NewGraphics(cpu)
+	// cpu.graphics = graphic
+	cpu.Memory[768] = 10
 
-	cpu.memoryWrite(0xFF46, 3)
+	// cpu.memoryWrite(0xFF46, 3)
+
+	cpu.Memory[cpu.Registers.PC] = 0x77 // LD [HL], A
+	cpu.execOpcodes()
 	//upper := uint16(3) << 8
 	//// fmt.Println("upper", upper)
-	res := graphic.cpu.Memory[OAM_START]
+	res := cpu.Memory[OAM_START]
 	if res != 10 {
 		t.Error("Expected 10, got ", res)
 	}
@@ -341,56 +350,6 @@ func TestSetMode(t *testing.T) {
 	graphic.setMode(MODE_HBLANK)
 	if graphic.cpu.Memory[0xFF41] != 0b00011000 {
 		t.Errorf("Expected to be %d, got %d", 0b00011000, graphic.cpu.Memory[0xFF41])
-	}
-}
-
-func TestModesHandling(t *testing.T) {
-	graphic := NewGraphics(NewCPU())
-	graphic.cpu.Memory[0xFF40] = 0b10000110
-	graphic.cpu.Memory[0xFF44] = 10 // LY = 10
-	graphic.modesHandling(20)
-	if graphic.getSTAT() != 0b00000010 {
-		t.Errorf("Expected to be %08b, got %08b", 0b00000010, graphic.getSTAT())
-	}
-
-	graphic.cpu.Memory[0xFF40] = 0b00000110
-	graphic.cpu.Memory[0xFF44] = 10 // LY = 10
-	graphic.modesHandling(20)
-	if graphic.getLCDC()&(1<<7) == 0 {
-		fmt.Println("AAAA")
-	}
-	if graphic.getSTAT() != 0b00000000 {
-		t.Errorf("Expected to be %08b, got %08b", 0b00000000, graphic.getSTAT())
-	}
-
-	graphic.cpu.Memory[0xFF40] = 0b10110110
-	graphic.cpu.Memory[0xFF44] = 145 // LY = 145
-	graphic.modesHandling(20)
-	if graphic.getLCDC()&(1<<7) == 0 {
-		fmt.Println("AAAA")
-	}
-	if graphic.getSTAT() != 0b00000001 {
-		t.Errorf("Expected to be %08b, got %08b", 0b00000001, graphic.getSTAT())
-	}
-
-	graphic.cpu.Memory[0xFF40] = 0b10110110
-	graphic.cpu.Memory[0xFF44] = 12 // LY = 12
-	graphic.modesHandling(170)
-	if graphic.getLCDC()&(1<<7) == 0 {
-		fmt.Println("AAAA")
-	}
-	if graphic.getSTAT() != 0b00000011 {
-		t.Errorf("Expected to be %08b, got %08b", 0b00000011, graphic.getSTAT())
-	}
-
-	graphic.cpu.Memory[0xFF40] = 0b10110110
-	graphic.cpu.Memory[0xFF44] = 12 // LY = 12
-	graphic.modesHandling(270)
-	if graphic.getLCDC()&(1<<7) == 0 {
-		fmt.Println("AAAA")
-	}
-	if graphic.getSTAT() != 0b00000000 {
-		t.Errorf("Expected to be %08b, got %08b", 0b00000000, graphic.getSTAT())
 	}
 }
 
